@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Kerala Tourism Social Dashboard</title>
+<link rel="stylesheet" href="app.css">
+<script src="d3.min.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<div id="root" class="kt">
+
+  <!-- Sign in -->
+  <div class="kt-login" id="login" hidden>
+    <form class="kt-login-card" id="login-form" autocomplete="on">
+      <p class="kt-brand">Kerala Tourism</p>
+      <p class="kt-sub">Sign in to view the social media dashboard.</p>
+      <label class="kt-field">Email address
+        <input id="login-email" type="email" autocomplete="username" required>
+      </label>
+      <label class="kt-field">Password
+        <input id="login-pass" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="kt-err" id="login-err" hidden></p>
+      <button class="kt-primary" type="submit">Sign in</button>
+    </form>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="app" hidden>
+    <div class="kt-head">
+      <div>
+        <h1 class="kt-title">Kerala Tourism social dashboard</h1>
+        <p class="kt-take" id="takeaway"></p>
+        <div class="kt-status">
+          <span id="run-status"></span>
+          <button class="kt-ghost" id="refresh" type="button">Refresh now</button>
+        </div>
+      </div>
+      <div class="kt-head-right">
+        <span class="kt-who" id="who"></span>
+        <button class="kt-ghost" id="signout" type="button">Sign out</button>
+      </div>
+    </div>
+
+    <div class="kt-bar">
+      <div class="kt-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="own" aria-selected="true">Social media performance</button>
+        <button type="button" role="tab" data-tab="domestic" aria-selected="false">Domestic competitors</button>
+        <button type="button" role="tab" data-tab="international" aria-selected="false">International competitors</button>
+        <button type="button" role="tab" data-tab="accounts" aria-selected="false">Accounts</button>
+      </div>
+      <div class="kt-seg" id="period" aria-label="Period">
+        <button type="button" data-period="daily" aria-pressed="false">Daily</button>
+        <button type="button" data-period="monthly" aria-pressed="true">Monthly</button>
+        <button type="button" data-period="yearly" aria-pressed="false">Yearly</button>
+      </div>
+    </div>
+
+    <section id="tab-own" data-page="own"></section>
+    <section id="tab-domestic" data-page="domestic" hidden></section>
+    <section id="tab-international" data-page="international" hidden></section>
+
+    <section id="tab-accounts" data-page="accounts" hidden>
+      <div class="kt-card">
+        <h3 id="form-title">Add an account</h3>
+        <p class="kt-note">Type usernames or paste profile links. Leave a platform empty if the account isn't on it.</p>
+        <form class="kt-form" id="acct-form">
+          <label class="kt-field">Name
+            <input name="name" required maxlength="80" placeholder="e.g. Goa Tourism">
+          </label>
+          <label class="kt-field">Type
+            <select name="group">
+              <option value="own">Your account (Kerala Tourism)</option>
+              <option value="domestic">Domestic competitor</option>
+              <option value="international">International competitor</option>
+            </select>
+          </label>
+          <label class="kt-field">Instagram username
+            <input name="instagram" placeholder="keralatourism">
+          </label>
+          <label class="kt-field">Facebook page
+            <input name="facebook" placeholder="facebook.com/… or page name">
+          </label>
+          <label class="kt-field">YouTube channel
+            <input name="youtube" placeholder="@handle or channel link">
+          </label>
+          <label class="kt-field">X (Twitter) username
+            <input name="x" placeholder="KeralaTourism">
+          </label>
+          <div class="kt-form-actions">
+            <button class="kt-primary" type="submit" id="form-save">Add account</button>
+            <button class="kt-ghost" type="button" id="form-cancel" hidden>Cancel</button>
+          </div>
+        </form>
+        <p class="kt-msg" id="form-msg" hidden></p>
+      </div>
+
+      <h2 class="kt-section-title">Your accounts</h2>
+      <div data-list="own"></div>
+      <h2 class="kt-section-title">Domestic competitors</h2>
+      <div data-list="domestic"></div>
+      <h2 class="kt-section-title">International competitors</h2>
+      <div data-list="international"></div>
+
+      <h2 class="kt-section-title">Updates</h2>
+      <div class="kt-card kt-stack">
+        <label class="kt-field">Fetch follower counts from Apify
+          <select class="kt-select" id="schedule">
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+            <option value="off">Only when I click Refresh now</option>
+          </select>
+        </label>
+        <p class="kt-hint">Each fetch costs about $0.002–0.003 per Instagram, YouTube or X account and about $0.012 per Facebook page from your Apify credit.</p>
+        <div id="last-run"></div>
+      </div>
+    </section>
+
+    <p class="kt-foot">Follower counts are fetched from public profiles with Apify. History starts from the first fetch.</p>
+  </div>
+</div>
+</body>
+</html>

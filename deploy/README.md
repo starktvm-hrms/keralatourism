@@ -1,16 +1,41 @@
-# Hosting the dashboard at kt.starkpeople.in
+# Running the dashboard on the VPS (kt.starkpeople.in)
 
-Every push to `main` builds `dist/index.html` and copies it to the VPS
-(`.github/workflows/vps.yml`), the same way ktgame is deployed.
+The dashboard is a small Node app (no npm packages) behind nginx on the
+existing VPS. Every push to `main` copies `server/` and `public/` to
+`/opt/kt-dashboard` and restarts it (`.github/workflows/vps.yml`).
 
-## One-time setup
+| What | Where on the VPS |
+|---|---|
+| App code | `/opt/kt-dashboard` |
+| Logins, accounts, follower history | `/var/lib/kt-dashboard/*.json` |
+| Apify token, session secret | `/etc/kt-dashboard.env` (root only) |
+| Service | `systemctl status kt-dashboard`, logs: `journalctl -u kt-dashboard` |
+| nginx site | `/etc/nginx/sites-available/kt` |
 
-1. **DNS** — done: `kt.starkpeople.in` has an A record to the VPS (76.13.241.150).
-2. **VPS** — as root on the VPS (hPanel → VPS → Browser terminal):
-   `sudo bash vps-setup.sh you@example.com`
-   It reuses the existing `deploy` user, creates `/var/www/kt`, adds an
-   nginx site for this subdomain only and gets the HTTPS certificate.
-3. **GitHub secrets** — in this repository: Settings → Secrets and variables
-   → Actions. Add the same values used in the ktgame repository:
-   `VPS_HOST`, `VPS_USER` (`deploy`), `VPS_SSH_KEY`, and `VPS_PORT` if set there.
-4. **Deploy** — Actions → "Deploy dashboard to the VPS" → Run workflow, or push.
+## One-time setup (as root on the VPS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/starktvm-hrms/keralatourism/main/deploy/vps-setup.sh -o vps-setup.sh
+sudo bash vps-setup.sh
+```
+
+It asks for your Apify API token and the email/password for your first
+dashboard login. It is safe to run again.
+
+## Logins
+
+Add a login or change a password:
+
+```bash
+sudo -u deploy env DATA_DIR=/var/lib/kt-dashboard node /opt/kt-dashboard/server/add-user.js someone@example.com
+```
+
+Remove one: add `--remove` to that command.
+
+## Changing the Apify token
+
+Edit `APIFY_TOKEN=` in `/etc/kt-dashboard.env`, then `systemctl restart kt-dashboard`.
+
+## Backups
+
+Copy `/var/lib/kt-dashboard/` — it holds everything the dashboard saves.
