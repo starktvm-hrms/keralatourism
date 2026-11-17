@@ -135,3 +135,15 @@ button.kt-tile { cursor: pointer; }
 .kt-theme { margin: 0; }
 .kt-theme button { padding: 2px var(--cds-pad-sm); }
 .kt-login-theme { position: fixed; top: 16px; right: 16px; }
+/* ranked comparison bars */
+:root { --kt-bar: #4285f4; --kt-own: #f1c232; --kt-bar-label: #3b78e7; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --kt-bar: #6ea2f7; --kt-own: #f4c94a; --kt-bar-label: #8ab4f8; } }
+:root[data-theme="dark"] { --kt-bar: #6ea2f7; --kt-own: #f4c94a; --kt-bar-label: #8ab4f8; }
+.kt-bar { fill: var(--kt-bar); }
+.kt-bar-own { fill: var(--kt-own); }
+.kt-bar-label { fill: var(--kt-bar-label); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); font-variant-numeric: tabular-nums; }
+.kt-bar-label.own { fill: var(--color-fg); font-weight: 600; }
+.kt-axis-title { fill: var(--color-fg); font-size: var(--cds-font-size-caption); font-family: var(--font-anthropic-sans); }
+.kt-rank-name { fill: var(--color-fg); }
+.kt-rank-cards .kt-chart { min-height: 380px; }
+.kt-rank-cards .kt-chart { overflow-x: auto; overflow-y: hidden; }

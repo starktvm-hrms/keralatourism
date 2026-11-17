@@ -24,15 +24,16 @@
   // ---------- state ----------
   const state = {
     data: null, tab: 'own', period: 'monthly',
-    ownPick: null, ownPlatform: 'all', compPlatform: { domestic: 'instagram', international: 'instagram' },
+    ownPick: null, ownPlatform: 'all', compPlatform: { domestic: 'instagram', international: 'instagram' }, compOrder: 'asc',
     editing: null, poll: null,
   };
 
   // ---------- formatting ----------
-  const fmtN = (v) => (v == null ? '—' : d3.format(',')(v));
-  const fmtC = (v) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
+  const IN = new Intl.NumberFormat('en-IN');
+  const fmtN = (v) => (v == null ? '—' : IN.format(v));
+  const fmtC = (v) => new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
   const fmtP = (v) => (v == null || !isFinite(v) ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1) + '%');
-  const fmtSigned = (v) => (v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + d3.format(',')(Math.abs(v)));
+  const fmtSigned = (v) => (v == null ? '—' : (v > 0 ? '+' : v < 0 ? '−' : '') + IN.format(Math.abs(v)));
   const toDate = (s) => new Date(s + (s.length === 7 ? '-01' : s.length === 4 ? '-01-01' : '') + 'T00:00:00Z');
   const fmtDay = d3.utcFormat('%-d %b %Y');
   const keyLabel = { daily: (k) => d3.utcFormat('%-d %b')(toDate(k)), monthly: (k) => d3.utcFormat('%b ’%y')(toDate(k)), yearly: (k) => k };
@@ -207,6 +208,50 @@
       }).on('pointerleave', hide);
   }
 
+  // Ranked bar chart (one bar per account, value written above each bar), as used in the comparison tabs.
+  // o = {items:[{name, value, own}], fmt, axisFmt, yTitle, xTitle, order:'asc'|'desc'}
+  function rankChart(box, o) {
+    box.replaceChildren();
+    const items = [...o.items].sort((a, b) => (o.order === 'desc' ? b.value - a.value : a.value - b.value));
+    if (!items.length) return emptyChart(box, 'No data yet.');
+    const avail = box.clientWidth || 600, need = items.length * 52 + 110; // narrow screens: keep bars readable and scroll sideways
+    const W = Math.max(280, avail, need), RH = 380;
+    const svg = d3.select(box).append('svg').attr('class', 'kt-svg kt-rank').attr('width', W > avail ? W : '100%').attr('viewBox', `0 0 ${W} ${RH}`);
+    const lo = Math.min(0, d3.min(items, (d) => d.value)), hi = Math.max(0, d3.max(items, (d) => d.value)) || 1;
+    // room at the bottom for names written at 45°
+    const nameW = measure(items.map((d) => d.name)), mb = Math.min(150, Math.ceil(nameW * Math.SQRT1_2) + 26) + 26;
+    const y0 = d3.scaleLinear([lo, hi], [RH - mb, 0]).nice(5), ticks = y0.ticks(5);
+    const ml = Math.ceil(measure(ticks.map(o.axisFmt))) + 34, mr = 12;
+    const x = d3.scaleBand(items.map((d) => d.name), [ml, W - mr]).paddingInner(0.3).paddingOuter(0.15);
+    const bw = Math.min(56, x.bandwidth());
+    // value labels: horizontal when they fit over the bar, otherwise upright
+    const labW = measure(items.map((d) => o.fmt(d.value)));
+    const upright = labW + 6 > x.bandwidth() + x.step() * 0.3;
+    const mt = upright ? Math.ceil(labW) + 10 : 24;
+    const y = y0.copy().range([RH - mb, mt]);
+    const g = svg.append('g');
+    g.selectAll('line').data(ticks).join('line').attr('class', 'kt-gridline').attr('x1', ml).attr('x2', W - mr).attr('y1', (d) => y(d)).attr('y2', (d) => y(d));
+    g.selectAll('text').data(ticks).join('text').attr('class', 'kt-tick').attr('x', ml - 8).attr('y', (d) => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').text(o.axisFmt);
+    svg.append('text').attr('class', 'kt-axis-title').attr('transform', `translate(12,${(mt + RH - mb) / 2}) rotate(-90)`).attr('text-anchor', 'middle').text(o.yTitle);
+    svg.append('text').attr('class', 'kt-axis-title').attr('x', (ml + W - mr) / 2).attr('y', RH - 6).attr('text-anchor', 'middle').text(o.xTitle);
+    svg.append('line').attr('class', 'kt-axis').attr('x1', ml).attr('x2', W - mr).attr('y1', y(0)).attr('y2', y(0));
+    const cx = (d) => x(d.name) + x.bandwidth() / 2;
+    svg.append('g').selectAll('rect').data(items).join('rect')
+      .attr('class', (d) => (d.own ? 'kt-bar-own' : 'kt-bar'))
+      .attr('x', (d) => cx(d) - bw / 2).attr('width', bw)
+      .attr('y', (d) => Math.min(y(d.value), y(0))).attr('height', (d) => Math.max(1, Math.abs(y(d.value) - y(0)))).attr('rx', 2);
+    svg.append('g').selectAll('text').data(items).join('text')
+      .attr('class', (d) => 'kt-bar-label' + (d.own ? ' own' : ''))
+      .attr('text-anchor', (d) => (upright ? (d.value < 0 ? 'end' : 'start') : 'middle'))
+      .attr('transform', (d) => {
+        const ty = d.value < 0 ? y(d.value) + (upright ? 6 : 16) : y(d.value) - 6;
+        return upright ? `translate(${cx(d) + 4},${ty}) rotate(-90)` : `translate(${cx(d)},${ty})`;
+      })
+      .text((d) => o.fmt(d.value));
+    svg.append('g').selectAll('text').data(items).join('text').attr('class', 'kt-tick kt-rank-name')
+      .attr('text-anchor', 'end').attr('transform', (d) => `translate(${cx(d) + 4},${y.range()[0] + 14}) rotate(-45)`).text((d) => d.name);
+  }
+
   const PERIOD_NOTE = {
     followers: { daily: 'Followers on each day fetched, last 90 days.', monthly: 'Followers at the last fetch of each month, last 24 months.', yearly: 'Followers at the last fetch of each year.' },
     net: { daily: 'Net new followers between fetches; hover for growth %.', monthly: 'Net new followers each month; hover for growth %.', yearly: 'Net new followers each year; hover for growth %.' },
@@ -273,16 +318,18 @@
     if (!comps.length) return box.append(emptyState(`No ${group} competitors yet.`, `Add ${group} competitors`));
     const plat = state.compPlatform[group], per = state.period;
     box.append(el('div', { class: 'kt-row' }, el('span', { class: 'kt-label', text: 'Platform' }),
-      el('div', { class: 'kt-seg' }, [...PLATFORMS, 'all'].map((p) => el('button', { type: 'button', 'aria-pressed': String(p === plat), text: p === 'x' ? 'X' : PNAME[p], onclick: () => { state.compPlatform[group] = p; renderComp(group); } })))));
+      el('div', { class: 'kt-seg' }, [...PLATFORMS, 'all'].map((p) => el('button', { type: 'button', 'aria-pressed': String(p === plat), text: p === 'x' ? 'X' : PNAME[p], onclick: () => { state.compPlatform[group] = p; renderComp(group); } }))),
+      el('span', { class: 'kt-label', text: 'Order' }),
+      el('div', { class: 'kt-seg' }, [['asc', 'Ascending'], ['desc', 'Descending']].map(([v, t]) => el('button', { type: 'button', 'aria-pressed': String(state.compOrder === v), text: t, onclick: () => { state.compOrder = v; renderComp(group); } })))));
     const boards = [...own.slice(0, 1), ...comps].filter((a) => plat === 'all' || a.handles[plat]);
-    const pal = colors(), color = new Map(boards.map((a, i) => [a.id, pal[i % pal.length]]));
+    const color = new Map(boards.map((a) => [a.id, a.group === 'own' ? 'var(--kt-own)' : 'var(--kt-bar)']));
     const withData = boards.filter((a) => latest(a.id, plat).value != null);
     if (!withData.length) return box.append(emptyState(`No ${PNAME[plat]} follower counts yet for these accounts. Click “Refresh now” to fetch them.`));
     const ranked = [...withData].sort((a, b) => latest(b.id, plat).value - latest(a.id, plat).value);
     const me = own[0], rank = me ? ranked.findIndex((a) => a.id === me.id) : -1;
     box.append(el('p', { class: 'kt-note' }, rank >= 0 ? [`On ${PNAME[plat]}, ${me.name} ranks `, el('b', { text: `#${rank + 1} of ${ranked.length}` }), ` against the ${group} competitors tracked.`] : `Add your own account to compare it with these competitors.`));
     const tiles = el('div', { class: 'kt-tiles' });
-    for (const a of ranked) {
+    for (const a of state.compOrder === 'asc' ? [...ranked].reverse() : ranked) {
       const v = latest(a.id, plat);
       const t = el('div', { class: 'kt-tile' },
         el('span', { class: 'kt-tile-name' }, el('span', { class: 'kt-sw', style: `background:${color.get(a.id)};margin-right:6px` }), a.name),
@@ -292,9 +339,13 @@
       tiles.append(t);
     }
     box.append(tiles);
-    box.append(el('div', { class: 'kt-legend' }, boards.map((a) => el('span', { style: a.group === 'own' ? 'color:var(--color-fg)' : null }, el('span', { class: 'kt-sw', style: `background:${color.get(a.id)}` }), a.name))));
     const fid = 'cf-' + group, gid = 'cg-' + group;
-    box.append(el('div', { class: 'kt-grid2' }, card(fid, `Follower count · ${PNAME[plat]}`, PERIOD_NOTE.followers[per]), card(gid, `Growth rate · ${PNAME[plat]}`, PERIOD_NOTE.pct[per])));
+    const asOf = d3.max(withData, (a) => latest(a.id, plat).date);
+    const orderTxt = state.compOrder === 'asc' ? 'smallest to largest' : 'largest to smallest';
+    const prevTxt = { daily: 'the fetch before', monthly: 'the month before', yearly: 'the year before' }[per];
+    box.append(el('div', { class: 'kt-stack kt-rank-cards' },
+      card(fid, `Follower count · ${PNAME[plat]}`, `Followers at the latest fetch (${fmtDay(toDate(asOf))}), ${orderTxt}. Kerala Tourism is highlighted.`),
+      card(gid, `Growth rate · ${PNAME[plat]}`, `Follower growth % in the latest ${per === 'daily' ? 'fetch' : per === 'monthly' ? 'month' : 'year'} compared with ${prevTxt}, ${orderTxt}.`)));
     // table: every platform
     const tb = el('tbody');
     for (const a of [...own.slice(0, 1), ...comps]) {
@@ -306,16 +357,18 @@
     box.append(el('div', { class: 'kt-card' }, el('h3', { text: 'Followers by platform' }), el('p', { class: 'kt-note', text: 'Latest count for every account on every platform; 1 year compares total followers with about 12 months earlier.' }),
       el('div', { class: 'kt-tablewrap' }, el('table', { class: 'kt-table' }, el('thead', {}, el('tr', {}, ['Account', 'Instagram', 'Facebook', 'YouTube', 'X', 'Total', '1 year'].map((t) => el('th', { text: t })))), tb))));
 
-    const sers = boards.map((a) => ({ a, s: series(a.id, plat, per) }));
-    const keys = [...new Set(sers.flatMap((x) => [...x.s.keys()]))].sort();
-    const lines = sers.map(({ a, s }) => ({ name: a.name, color: color.get(a.id), values: s }));
-    if (!keys.length) emptyChart($('#' + fid), 'No data yet.');
-    else chart($('#' + fid), { type: 'bar', keys, label: keyLabel[per], tip: keyTip[per], series: lines, yFmt: fmtC, tipFmt: fmtN });
-    const gs = sers.map(({ a, s }) => { const g = growth(s); return { name: a.name, color: color.get(a.id), values: new Map([...g].map(([k, v]) => [k, v.pct])) }; });
-    const gk = [...new Set(gs.flatMap((x) => [...x.values.keys()]))].sort();
-    const pf = (v) => d3.format('.1f')(v) + '%';
-    if (!gk.length) emptyChart($('#' + gid), `Growth appears after the second ${per === 'daily' ? 'fetch' : per === 'monthly' ? 'month' : 'year'} of data.`);
-    else chart($('#' + gid), { type: 'bar', keys: gk, label: keyLabel[per], tip: keyTip[per], series: gs, yFmt: pf, tipFmt: fmtP });
+    const xTitle = (group === 'domestic' ? 'Domestic' : 'International') + ' Tourism Departments';
+    rankChart($('#' + fid), {
+      items: withData.map((a) => ({ name: a.name, value: latest(a.id, plat).value, own: a.group === 'own' })),
+      fmt: fmtN, axisFmt: fmtN, yTitle: 'Followers', xTitle, order: state.compOrder,
+    });
+    const gItems = [];
+    for (const a of withData) {
+      const g = growth(series(a.id, plat, per)), ks = [...g.keys()];
+      if (ks.length && g.get(ks[ks.length - 1]).pct != null) gItems.push({ name: a.name, value: Math.round(g.get(ks[ks.length - 1]).pct * 100) / 100, own: a.group === 'own' });
+    }
+    if (!gItems.length) emptyChart($('#' + gid), `Growth appears after the second ${per === 'daily' ? 'fetch' : per === 'monthly' ? 'month' : 'year'} of data.`);
+    else rankChart($('#' + gid), { items: gItems, fmt: (v) => fmtP(v), axisFmt: (v) => d3.format('.1f')(v) + '%', yTitle: 'Growth %', xTitle, order: state.compOrder });
   }
 
   // ---------- tab: accounts ----------
