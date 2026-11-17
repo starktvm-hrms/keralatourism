@@ -15,6 +15,7 @@ const SECRET = process.env.SESSION_SECRET || '';
 const PUBLIC = path.join(__dirname, '..', 'public');
 const GROUPS = ['own', 'domestic', 'international'];
 const SESSION_DAYS = 14;
+const VERSION = Date.now().toString(36);
 if (SECRET.length < 32) { console.error('SESSION_SECRET (32+ chars) must be set'); process.exit(1); }
 
 // ---------- passwords and sessions ----------
@@ -202,6 +203,11 @@ function serveStatic(req, res, urlPath) {
   const f = path.normalize(path.join(PUBLIC, rel));
   if (!f.startsWith(PUBLIC + path.sep) || !fs.existsSync(f) || !fs.statSync(f).isFile()) return send(res, 404, 'Not found');
   const ext = path.extname(f);
+  if (ext === '.html') { // stamp asset links with this server's start time, so a deploy is never mixed with cached files
+    const html = fs.readFileSync(f, 'utf8').replace(/(src|href)="([\w.-]+\.(?:js|css))"/g, `$1="$2?v=${VERSION}"`);
+    res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': TYPES[ext], 'Cache-Control': 'no-cache' });
+    return res.end(req.method === 'HEAD' ? undefined : html);
+  }
   res.writeHead(200, { ...SEC_HEADERS, 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600' });
   fs.createReadStream(f).pipe(res);
 }
