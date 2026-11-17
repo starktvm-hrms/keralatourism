@@ -16,6 +16,7 @@ const PUBLIC = path.join(__dirname, '..', 'public');
 const GROUPS = ['own', 'domestic', 'international'];
 const SESSION_DAYS = 14;
 const VERSION = Date.now().toString(36);
+const RETRIES = Math.max(0, Math.min(5, Number(process.env.SCRAPE_RETRIES ?? 2))); // extra immediate attempts for handles that came back empty
 if (SECRET.length < 32) { console.error('SESSION_SECRET (32+ chars) must be set'); process.exit(1); }
 
 // ---------- passwords and sessions ----------
@@ -94,12 +95,21 @@ async function scrapeAll(trigger) {
     for (const p of PLATFORMS) {
       const handles = [...new Set(accounts.map((a) => a.handles[p]).filter(Boolean))];
       if (!handles.length) continue;
-      let found;
-      try { found = await scrapers[p](handles); }
-      catch (e) {
-        for (const a of accounts) if (a.handles[p]) results.push({ account: a.id, platform: p, error: e.message });
-        console.error(`[scrape] ${p}:`, e.message);
-        continue;
+      // First try every handle; then immediately retry only the ones that came back
+      // without a count, up to RETRIES more times.
+      const found = new Map(), errors = new Map(), tries = new Map();
+      let pending = handles;
+      for (let attempt = 0; attempt <= RETRIES && pending.length; attempt++) {
+        if (attempt) console.log(`[scrape] ${p}: retrying ${pending.length} missing (${pending.join(', ')})`);
+        let got = null, failure = null;
+        try { got = await scrapers[p](pending); } catch (e) { failure = e.message; console.error(`[scrape] ${p}:`, e.message); }
+        for (const h of pending) {
+          tries.set(h, attempt + 1);
+          const r = got && got.get(h);
+          if (r && r.followers != null) { found.set(h, r); errors.delete(h); }
+          else errors.set(h, failure || (r && r.error) || 'No result from Apify (check the username)');
+        }
+        pending = pending.filter((h) => !found.has(h));
       }
       const d = today();
       const snaps = store.read('snapshots', []);
@@ -111,9 +121,10 @@ async function scrapeAll(trigger) {
           const i = snaps.findIndex((s) => s.a === a.id && s.p === p && s.d === d);
           const row = { d, a: a.id, p, f: r.followers };
           if (i >= 0) snaps[i] = row; else snaps.push(row);
-          results.push({ account: a.id, platform: p, followers: r.followers, name: r.name || '' });
+          results.push({ account: a.id, platform: p, followers: r.followers, name: r.name || '', tries: tries.get(h) });
         } else {
-          results.push({ account: a.id, platform: p, error: (r && r.error) || 'No result from Apify (check the username)' });
+          const n = tries.get(h) || 1;
+          results.push({ account: a.id, platform: p, error: errors.get(h) + (n > 1 ? ` (tried ${n} times)` : ''), tries: n });
         }
       }
       store.write('snapshots', snaps);

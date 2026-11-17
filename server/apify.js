@@ -3,7 +3,7 @@
 // each run to a few cents.
 'use strict';
 
-const API = 'https://api.apify.com/v2';
+const API = process.env.APIFY_API_BASE || 'https://api.apify.com/v2'; // override only for local testing
 const ACTORS = {
   instagram: 'apify~instagram-profile-scraper',
   facebook: 'apify~facebook-pages-scraper',
