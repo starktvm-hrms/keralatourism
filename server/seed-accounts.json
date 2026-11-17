@@ -1,0 +1,32 @@
+[
+  { "name": "Kerala Tourism", "group": "own", "handles": {
+    "instagram": "https://www.instagram.com/keralatourism/",
+    "facebook": "https://www.facebook.com/keralatourismofficial",
+    "x": "https://twitter.com/KeralaTourism" } },
+  { "name": "Australia", "group": "international", "handles": {
+    "instagram": "https://www.instagram.com/australia",
+    "facebook": "https://www.facebook.com/SeeAustralia",
+    "x": "https://x.com/Australia" } },
+  { "name": "Dubai", "group": "international", "handles": {
+    "instagram": "https://www.instagram.com/visit.dubai",
+    "facebook": "https://www.facebook.com/visitdubai/",
+    "x": "https://x.com/visitdubai" } },
+  { "name": "USA", "group": "international", "handles": {
+    "instagram": "https://www.instagram.com/visittheusa/",
+    "facebook": "https://www.facebook.com/VisitTheUSA",
+    "x": "https://x.com/VisitTheUSA" } },
+  { "name": "Singapore", "group": "international", "handles": {
+    "instagram": "https://www.instagram.com/visit_singapore/",
+    "facebook": "https://www.facebook.com/VisitSingaporeOfficial/",
+    "x": "https://x.com/VisitSingapore" } },
+  { "name": "Thailand", "group": "international", "handles": {
+    "instagram": "https://www.instagram.com/tourismthailand/",
+    "facebook": "https://www.facebook.com/AmazingThailand",
+    "x": "https://x.com/thailandfanclub" } },
+  { "name": "Indonesia", "group": "international", "handles": {
+    "instagram": "https://www.instagram.com/wonderfulindonesia/",
+    "facebook": "https://www.facebook.com/WonderfulIndonesia" } },
+  { "name": "Malaysia", "group": "international", "handles": {
+    "instagram": "https://www.instagram.com/malaysia.truly.asia",
+    "facebook": "https://www.facebook.com/malaysia.travel.my" } }
+]

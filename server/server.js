@@ -125,6 +125,40 @@ async function scrapeAll(trigger) {
   return running;
 }
 
+// The schedule counts from when the server first ran, so a fresh install or newly
+// added accounts never trigger an immediate fetch; use "Refresh now" for that.
+if (!getSettings().lastScheduled) store.write('settings', { ...getSettings(), lastScheduled: new Date().toISOString() });
+
+// Accounts listed in seed-accounts.json are added once (by type + name). One that
+// was added before is never re-added, even if it was deleted in the dashboard.
+(function importSeed() {
+  let seed;
+  try { seed = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-accounts.json'), 'utf8')); }
+  catch (e) { if (e.code !== 'ENOENT') console.error('[seed] unreadable:', e.message); return; }
+  const settings = getSettings(), done = new Set(settings.seeded || []);
+  const accounts = store.read('accounts', []);
+  const key = (g, n) => g + ':' + String(n).trim().toLowerCase();
+  let added = 0;
+  for (const s of seed) {
+    const k = key(s.group, s.name);
+    if (done.has(k)) continue;
+    done.add(k);
+    const existing = accounts.find((a) => key(a.group, a.name) === k);
+    if (existing) { // fill in platforms that are still empty; never overwrite
+      try {
+        const extra = cleanAccount(s).handles;
+        for (const p of Object.keys(extra)) if (!existing.handles[p]) { existing.handles[p] = extra[p]; added++; }
+      } catch (e) { console.error('[seed]', s.name, e.message); }
+      continue;
+    }
+    try { accounts.push({ id: crypto.randomBytes(6).toString('hex'), ...cleanAccount(s), created: new Date().toISOString() }); added++; }
+    catch (e) { console.error('[seed]', s.name, e.message); }
+  }
+  store.write('accounts', accounts);
+  store.write('settings', { ...getSettings(), seeded: [...done] });
+  if (added) console.log(`[seed] added ${added} account(s) or usernames`);
+})();
+
 // schedule: checked every 30 minutes
 function scheduleDue() {
   const s = getSettings();
