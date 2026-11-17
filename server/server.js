@@ -147,27 +147,39 @@ if (!getSettings().lastScheduled) store.write('settings', { ...getSettings(), la
   let seed;
   try { seed = JSON.parse(fs.readFileSync(path.join(__dirname, 'seed-accounts.json'), 'utf8')); }
   catch (e) { if (e.code !== 'ENOENT') console.error('[seed] unreadable:', e.message); return; }
-  const settings = getSettings(), done = new Set(settings.seeded || []);
+  const settings = getSettings(), done = new Set(settings.seeded || []), doneH = new Set(settings.seededHandles || []);
+  if (!settings.seededHandles) { // first run of username tracking: treat what earlier versions already handled as done
+    for (const s of seed) {
+      if (!done.has(String(s.group) + ':' + String(s.name).trim().toLowerCase())) continue;
+      try { for (const [p, h] of Object.entries(cleanAccount(s).handles)) if (!(s.newHandles || []).includes(p)) doneH.add(`${s.group}:${String(s.name).trim().toLowerCase()}:${p}:${h}`); } catch (e) {}
+    }
+  }
   const accounts = store.read('accounts', []);
   const key = (g, n) => g + ':' + String(n).trim().toLowerCase();
   let added = 0;
   for (const s of seed) {
     const k = key(s.group, s.name);
-    if (done.has(k)) continue;
-    done.add(k);
+    let clean;
+    try { clean = cleanAccount(s); } catch (e) { console.error('[seed]', s.name, e.message); continue; }
     const existing = accounts.find((a) => key(a.group, a.name) === k);
-    if (existing) { // fill in platforms that are still empty; never overwrite
-      try {
-        const extra = cleanAccount(s).handles;
-        for (const p of Object.keys(extra)) if (!existing.handles[p]) { existing.handles[p] = extra[p]; added++; }
-      } catch (e) { console.error('[seed]', s.name, e.message); }
-      continue;
+    if (!done.has(k)) {
+      done.add(k);
+      if (!existing) {
+        accounts.push({ id: crypto.randomBytes(6).toString('hex'), ...clean, created: new Date().toISOString() }); added++;
+        for (const [p, h] of Object.entries(clean.handles)) doneH.add(`${k}:${p}:${h}`);
+        continue;
+      }
+    } else if (!existing) continue; // deleted in the dashboard: leave it deleted
+    // a username listed here for the first time fills that platform once if it is empty; never overwrites
+    for (const [p, h] of Object.entries(clean.handles)) {
+      const hk = `${k}:${p}:${h}`;
+      if (doneH.has(hk)) continue;
+      doneH.add(hk);
+      if (!existing.handles[p]) { existing.handles[p] = h; added++; }
     }
-    try { accounts.push({ id: crypto.randomBytes(6).toString('hex'), ...cleanAccount(s), created: new Date().toISOString() }); added++; }
-    catch (e) { console.error('[seed]', s.name, e.message); }
   }
   store.write('accounts', accounts);
-  store.write('settings', { ...getSettings(), seeded: [...done] });
+  store.write('settings', { ...getSettings(), seeded: [...done], seededHandles: [...doneH] });
   if (added) console.log(`[seed] added ${added} account(s) or usernames`);
 })();
 

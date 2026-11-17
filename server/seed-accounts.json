@@ -58,16 +58,24 @@
   "group": "international",
   "handles": {
    "instagram": "https://www.instagram.com/wonderfulindonesia/",
-   "facebook": "https://www.facebook.com/WonderfulIndonesia"
-  }
+   "facebook": "https://www.facebook.com/WonderfulIndonesia",
+   "x": "https://x.com/indotourism"
+  },
+  "newHandles": [
+   "x"
+  ]
  },
  {
   "name": "Malaysia",
   "group": "international",
   "handles": {
    "instagram": "https://www.instagram.com/malaysia.truly.asia",
-   "facebook": "https://www.facebook.com/malaysia.travel.my"
-  }
+   "facebook": "https://www.facebook.com/malaysia.travel.my",
+   "x": "https://x.com/TourismMalaysia"
+  },
+  "newHandles": [
+   "x"
+  ]
  },
  {
   "name": "Incredible India Tourism",
