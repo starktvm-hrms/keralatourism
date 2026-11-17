@@ -39,7 +39,7 @@
   const keyTip = { daily: (k) => fmtDay(toDate(k)), monthly: (k) => d3.utcFormat('%B %Y')(toDate(k)), yearly: (k) => k };
   const cls = (v) => (v > 0 ? 'kt-up' : v < 0 ? 'kt-down' : '');
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-  const colors = () => d3.range(8).map((i) => css('--kt-c' + i));
+  const colors = () => d3.range(12).map((i) => css('--kt-c' + i));
 
   // ---------- API ----------
   async function api(path, opts = {}) {
@@ -122,6 +122,10 @@
     const W = Math.max(260, box.clientWidth || 600);
     const root = d3.select(box);
     const svg = root.append('svg').attr('class', 'kt-svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    if (o.type === 'bar') { // keep bars readable: drop the oldest periods when bars would get thinner than ~6px
+      const fit = Math.max(1, Math.floor((W - 60) / (o.series.length * 7 + 6)));
+      if (o.keys.length > fit) o = { ...o, keys: o.keys.slice(-fit) };
+    }
     const vals = o.series.flatMap((s) => o.keys.map((k) => s.values.get(k))).filter((v) => v != null && isFinite(v));
     if (!vals.length) return emptyChart(box, 'Not enough history yet.');
     let lo = d3.min(vals), hi = d3.max(vals);
@@ -256,7 +260,7 @@
     const ser = series(acct.id, plat, per), keys = [...ser.keys()];
     if (!keys.length) emptyChart($('#own-f'), 'No data yet.');
     else if (per === 'yearly') chart($('#own-f'), { type: 'bar', keys, label: keyLabel[per], tip: keyTip[per], series: [{ name: 'Followers', color: c0, values: ser }], yFmt: fmtC, tipFmt: fmtN });
-    else chart($('#own-f'), { type: 'line', free: true, area: true, keys, label: keyLabel[per], tip: keyTip[per], series: [{ name: 'Followers', color: c0, values: ser }], yFmt: fmtC, tipFmt: fmtN });
+    else chart($('#own-f'), { type: 'bar', keys, label: keyLabel[per], tip: keyTip[per], series: [{ name: 'Followers', color: c0, values: ser }], yFmt: fmtC, tipFmt: fmtN });
     const g = growth(ser), gk = [...g.keys()];
     if (!gk.length) emptyChart($('#own-g'), `Growth appears after the second ${per === 'daily' ? 'fetch' : per === 'monthly' ? 'month' : 'year'} of data.`);
     else chart($('#own-g'), { type: 'bar', keys: gk, label: keyLabel[per], tip: keyTip[per], series: [{ name: 'Net new', color: c0, values: new Map(gk.map((k) => [k, g.get(k).net])), notes: new Map(gk.map((k) => [k, fmtP(g.get(k).pct)])) }], yFmt: fmtC, tipFmt: fmtSigned });
@@ -306,12 +310,12 @@
     const keys = [...new Set(sers.flatMap((x) => [...x.s.keys()]))].sort();
     const lines = sers.map(({ a, s }) => ({ name: a.name, color: color.get(a.id), values: s }));
     if (!keys.length) emptyChart($('#' + fid), 'No data yet.');
-    else chart($('#' + fid), { type: 'line', keys, label: keyLabel[per], tip: keyTip[per], series: lines, yFmt: fmtC, tipFmt: fmtN });
+    else chart($('#' + fid), { type: 'bar', keys, label: keyLabel[per], tip: keyTip[per], series: lines, yFmt: fmtC, tipFmt: fmtN });
     const gs = sers.map(({ a, s }) => { const g = growth(s); return { name: a.name, color: color.get(a.id), values: new Map([...g].map(([k, v]) => [k, v.pct])) }; });
     const gk = [...new Set(gs.flatMap((x) => [...x.values.keys()]))].sort();
     const pf = (v) => d3.format('.1f')(v) + '%';
     if (!gk.length) emptyChart($('#' + gid), `Growth appears after the second ${per === 'daily' ? 'fetch' : per === 'monthly' ? 'month' : 'year'} of data.`);
-    else chart($('#' + gid), { type: per === 'yearly' ? 'bar' : 'line', free: true, keys: gk, label: keyLabel[per], tip: keyTip[per], series: gs, yFmt: pf, tipFmt: fmtP });
+    else chart($('#' + gid), { type: 'bar', keys: gk, label: keyLabel[per], tip: keyTip[per], series: gs, yFmt: pf, tipFmt: fmtP });
   }
 
   // ---------- tab: accounts ----------
@@ -412,6 +416,16 @@
     await load(); openTab(state.tab);
   }
 
+  // ---------- theme ----------
+  const savedTheme = () => { try { return localStorage.getItem('kt-theme') || 'auto'; } catch (e) { return 'auto'; } };
+  function setTheme(t) {
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem('kt-theme', t); } catch (e) {}
+    $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === t)));
+    render();
+  }
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (savedTheme() === 'auto') render(); });
+
   // ---------- events ----------
   document.addEventListener('DOMContentLoaded', async () => {
     $('#login-form').addEventListener('submit', async (e) => {
@@ -419,6 +433,8 @@
       try { const r = await api('login', { method: 'POST', body: { email: $('#login-email').value, password: $('#login-pass').value } }); $('#login-pass').value = ''; showApp(r.email); }
       catch (x) { err.textContent = x.message; err.hidden = false; }
     });
+    $$('[data-theme-set]').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.themeSet)));
+    $$('[data-theme-set]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.themeSet === savedTheme())));
     $('#signout').addEventListener('click', async () => { try { await api('logout', { method: 'POST', body: {} }); } catch (e) {} state.data = null; showLogin(); });
     $$('[data-tab]').forEach((b) => b.addEventListener('click', () => openTab(b.dataset.tab)));
     $$('[data-period]').forEach((b) => b.addEventListener('click', () => { state.period = b.dataset.period; render(); }));
