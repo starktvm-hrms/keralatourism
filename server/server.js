@@ -170,12 +170,21 @@ if (!getSettings().lastScheduled) store.write('settings', { ...getSettings(), la
         continue;
       }
     } else if (!existing) continue; // deleted in the dashboard: leave it deleted
-    // a username listed here for the first time fills that platform once if it is empty; never overwrites
+    // A username listed here for the first time is applied once: it fills an empty platform, or replaces
+    // a username this list set earlier. A username typed in the dashboard is never overwritten.
     for (const [p, h] of Object.entries(clean.handles)) {
       const hk = `${k}:${p}:${h}`;
       if (doneH.has(hk)) continue;
       doneH.add(hk);
-      if (!existing.handles[p]) { existing.handles[p] = h; added++; }
+      const cur = existing.handles[p];
+      if (!cur) { existing.handles[p] = h; added++; }
+      else if (cur !== h && doneH.has(`${k}:${p}:${cur}`)) {
+        existing.handles[p] = h; added++;
+        // the old username's counts belong to a different profile: drop them
+        const snaps = store.read('snapshots', []);
+        const keep = snaps.filter((x) => !(x.a === existing.id && x.p === p && !x.m));
+        if (keep.length !== snaps.length) { store.write('snapshots', keep); console.log(`[seed] ${s.name} ${p}: ${cur} -> ${h}, removed ${snaps.length - keep.length} old count(s)`); }
+      }
     }
   }
   store.write('accounts', accounts);
