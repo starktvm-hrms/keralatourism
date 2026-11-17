@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerala Tourism Social Dashboard</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+:root {
+  --font-anthropic-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-anthropic-serif: Georgia, "Times New Roman", serif;
+  --color-fg: #1f1e1c; --color-fg-muted: #6b6862; --color-bg: #faf9f6; --color-panel: #ffffff;
+  --color-border-line: #e4e1da; --color-ok: #2f7d4f; --color-warn: #a36a00; --color-bad: #b3412e;
+  --cds-font-size-caption: 0.8125rem; --cds-font-size-body: 0.9375rem; --cds-font-size-heading: 1.0625rem; --cds-font-size-title: 1.75rem;
+  --cds-font-weight-medium: 500;
+  --cds-gap-xs: 4px; --cds-gap-sm: 8px; --cds-gap-md: 16px; --cds-gap-lg: 24px; --cds-gap-xl: 40px;
+  --cds-pad-xs: 4px; --cds-pad-sm: 8px; --cds-pad-md: 12px; --cds-pad-lg: 20px; --cds-pad-xl: 32px;
+  --cds-radius: 8px;
+  --cds-chart-grid: #ecebe6; --cds-chart-axis: #b9b5ac; --cds-chart-reference: #9a968d; --cds-chart-muted: #c9c5bc;
+  --cds-surface-popover: #ffffff; --cds-border: #e4e1da; --cds-shadow-popover: 0 4px 16px rgba(0,0,0,.10);
+  --cds-text-secondary: #6b6862; --cds-dur-slow: 300ms;
+  --kt-c0: #1f7a5c; --kt-c1: #d9822b; --kt-c2: #3d6fb6; --kt-c3: #a8467e; --kt-c4: #7a8a2b; --kt-c5: #6a5acd; --kt-c6: #c44d4d; --kt-c7: #3a9aa8;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-fg: #ecebe7; --color-fg-muted: #a5a29b; --color-bg: #1a1917; --color-panel: #23221f;
+    --color-border-line: #3a3834; --color-ok: #6cc28f; --color-warn: #e0a640; --color-bad: #ee7a66;
+    --cds-chart-grid: #2f2d2a; --cds-chart-axis: #57544e; --cds-chart-reference: #77736b; --cds-chart-muted: #4a4743;
+    --cds-surface-popover: #2b2a27; --cds-border: #3a3834; --cds-shadow-popover: 0 4px 16px rgba(0,0,0,.45);
+    --cds-text-secondary: #a5a29b;
+    --kt-c0: #4cc19a; --kt-c1: #f0a050; --kt-c2: #78a3e6; --kt-c3: #d97bb0; --kt-c4: #b6c45a; --kt-c5: #a08ff0; --kt-c6: #ee8080; --kt-c7: #6cc8d4;
+    color-scheme: dark;
+  }
+}
+html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-anthropic-sans); }
+#dash-root { max-width: 1280px; margin: 0 auto; padding: 24px clamp(16px, 3vw, 40px) 48px; box-sizing: border-box; }
+.dash-skeleton { position: relative; color: transparent !important; }
+.dash-skeleton:empty::after, .kt-chart.dash-skeleton::after { content: ""; position: absolute; inset: 0; border-radius: var(--cds-radius); background: var(--color-border-line); opacity: .5; }
+span.dash-skeleton, b.dash-skeleton { background: var(--color-border-line); border-radius: 4px; }
+</style>
+<script>
+/* Minimal stand-alone runtime for the dashboard page (replaces the claude.ai dashboard runtime). */
+(function () {
+  const datasets = {}, calcs = [], draws = new Map(), listeners = [];
+  let params = {};
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const colors = [];
+  const refreshColors = () => { colors.length = 0; for (let i = 0; i < 8; i++) colors.push(css('--kt-c' + i)); };
+  const visible = (el) => { for (let n = el; n; n = n.parentElement) if (n.hidden) return false; return true; };
+  let queued = false;
+  const runAll = () => {
+    queued = false;
+    for (const fn of listeners) { try { fn(); } catch (e) { console.error(e); } }
+    for (const [name, fn] of draws) {
+      document.querySelectorAll('[data-draw="' + name + '"]').forEach((el) => {
+        if (!visible(el)) return;
+        try { fn(el); } catch (e) { console.error(e); }
+      });
+    }
+  };
+  const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(runAll); } };
+  window.dash = {
+    colors,
+    _setData(id, rows) {
+      datasets[id] = rows;
+      for (const c of calcs) datasets[c.id] = c.fn(...c.inputs.map((i) => datasets[i] || []));
+    },
+    data(id) { const d = datasets[id]; return d ? { status: 'ok', data: d, rows: d, columns: d[0] ? Object.keys(d[0]) : [], refreshing: false, meta: [] } : { status: 'missing', data: [], rows: [], columns: [], meta: [] }; },
+    calc(id, o) { calcs.push({ id, inputs: o.inputs, fn: o.fn }); if (o.inputs.every((i) => datasets[i])) datasets[id] = o.fn(...o.inputs.map((i) => datasets[i])); },
+    loader() {},
+    draw(name, fn) { draws.set(name, typeof fn === 'function' ? fn : (fn.update ? (el) => fn.update(el, fn.mount && fn.mount(el)) : () => {})); schedule(); },
+    onData(fn) { listeners.push(fn); try { fn(); } catch (e) { console.error(e); } },
+    params() { return { ...params }; },
+    setParams(p) { for (const k in p) { if (p[k] == null) delete params[k]; else params[k] = p[k]; } schedule(); },
+    resetParams() { params = { ...window.__DASH_PARAMS__ }; schedule(); },
+    setLink(name) { try { history.replaceState(null, '', '#' + name); } catch (e) {} },
+    refresh() { schedule(); },
+    _schedule: schedule,
+  };
+  refreshColors();
+  params = { ...(window.__DASH_PARAMS__ = { period: 'monthly', own_platform: 'All platforms', comp_platform: 'Instagram' }) };
+  window.addEventListener('resize', schedule);
+  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { refreshColors(); schedule(); });
+  document.addEventListener('DOMContentLoaded', () => {
+    new MutationObserver(schedule).observe(document.getElementById('dash-root'), { attributes: true, attributeFilter: ['hidden'], subtree: true });
+    schedule();
+  });
+})();
+</script>
+<script>/*D3*/</script>
+<script>dash._setData('followers_monthly', /*DATA*/);</script>
+</head>
+<body>
+<div id="dash-root">
+/*PAGE*/
+</div>
+</body>
+</html>

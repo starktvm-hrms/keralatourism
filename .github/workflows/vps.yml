@@ -1,0 +1,52 @@
+# Builds the dashboard and copies it to the VPS that serves
+#   https://kt.starkpeople.in
+# over SSH with rsync, on every push to main and on demand.
+# One-time setup is in deploy/README.md. Repository secrets used:
+#   VPS_HOST     the VPS's IP address or hostname
+#   VPS_USER     the user to log in as ("deploy", as for ktgame)
+#   VPS_SSH_KEY  that user's private SSH key (the whole file)
+#   VPS_PORT     optional, the SSH port (default 22)
+# The job is skipped until VPS_HOST is set.
+name: Deploy dashboard to the VPS
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_VPS: ${{ secrets.VPS_HOST != '' }}
+    steps:
+      - name: Check the VPS secrets
+        if: env.HAS_VPS != 'true'
+        run: echo "::notice::VPS_HOST is not set; see deploy/README.md. Skipping."
+      - uses: actions/checkout@v4
+        if: env.HAS_VPS == 'true'
+      - name: Build
+        if: env.HAS_VPS == 'true'
+        run: python3 build.py
+      - name: Copy to the VPS
+        if: env.HAS_VPS == 'true'
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+          USER_: ${{ secrets.VPS_USER }}
+          KEY: ${{ secrets.VPS_SSH_KEY }}
+          PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          P=${PORT:-22}
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/vps && chmod 600 ~/.ssh/vps
+          ssh-keyscan -p "$P" -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          rsync -az --delete -e "ssh -i ~/.ssh/vps -p $P" dist/ "$USER_@$HOST:/var/www/kt/"
+          echo "Deployed $(echo $GITHUB_SHA | cut -c1-8) to https://kt.starkpeople.in"
