@@ -35,7 +35,7 @@ server {
     root $ROOT;
     index index.html;
     gzip on;
-    gzip_types text/html application/javascript application/json;
+    gzip_types application/javascript application/json;
     add_header X-Robots-Tag "noindex, nofollow" always;
     location = /index.html { add_header Cache-Control "no-cache"; add_header X-Robots-Tag "noindex, nofollow" always; }
     location / { try_files \$uri \$uri/ /index.html; }
