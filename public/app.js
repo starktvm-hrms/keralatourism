@@ -387,9 +387,15 @@
           el('td', { text: a.name }),
           PLATFORMS.map((p) => {
             if (!a.handles[p]) return el('td', { text: '—' });
-            const err = lastResult(a.id, p), v = latest(a.id, p);
-            return el('td', {}, el('a', { href: a.urls[p], target: '_blank', rel: 'noopener', text: a.handles[p] }),
-              el('span', { class: 'kt-small' + (err ? ' kt-bad' : ''), text: err ? 'Last fetch failed' : v.value != null ? fmtN(v.value) : 'Not fetched yet', title: err || '' }));
+            const err = lastResult(a.id, p), ss = snapsOf(a.id, p), last = ss[ss.length - 1];
+            const runDay = state.data.lastRun ? state.data.lastRun.finished.slice(0, 10) : null;
+            const failedNow = err && !(last && runDay && last.d >= runDay); // a value for that day (e.g. typed in) covers the failure
+            const parts = [];
+            if (last) parts.push(el('span', { class: 'kt-small', text: fmtN(last.f) + (last.m ? ' · entered ' + fmtDay(toDate(last.d)) : '') }));
+            if (failedNow) parts.push(el('span', { class: 'kt-small kt-bad', text: 'Last fetch failed', title: err }));
+            else if (!last) parts.push(el('span', { class: 'kt-small', text: 'Not fetched yet' }));
+            parts.push(el('button', { class: 'kt-link kt-small kt-enter', type: 'button', text: failedNow || !last ? 'Enter value' : 'Edit value', onclick: () => openManual(a, p) }));
+            return el('td', {}, el('a', { href: a.urls[p], target: '_blank', rel: 'noopener', text: a.handles[p] }), parts);
           }),
           el('td', {}, el('div', { class: 'kt-actions' },
             el('button', { class: 'kt-ghost', type: 'button', text: 'Edit', onclick: () => editAccount(a) }),
@@ -405,7 +411,9 @@
       lr.append(el('p', { class: 'kt-msg', text: `Last fetch ${fmtDay(new Date(run.finished))} ${d3.timeFormat('%H:%M')(new Date(run.finished))}: ${ok} updated${bad.length ? `, ${bad.length} failed` : ''}.` }));
       for (const b of bad.slice(0, 12)) {
         const a = state.data.accounts.find((x) => x.id === b.account);
-        lr.append(el('p', { class: 'kt-msg bad', text: `${a ? a.name : 'Removed account'} · ${PNAME[b.platform]}: ${b.error}` }));
+        const ss = a ? snapsOf(a.id, b.platform) : [], last = ss[ss.length - 1];
+        const covered = last && last.m && last.d >= run.finished.slice(0, 10);
+        lr.append(el('p', { class: 'kt-msg ' + (covered ? '' : 'bad'), text: `${a ? a.name : 'Removed account'} · ${PNAME[b.platform]}: ${b.error}` + (covered ? ' — value entered by hand' : '') }));
       }
     }
   }
@@ -425,6 +433,27 @@
     if (!confirm(`Delete ${a.name} and all of its follower history?`)) return;
     try { state.data = await api('accounts/' + a.id, { method: 'DELETE', body: {} }); if (state.editing === a.id) resetForm(); render(); }
     catch (e) { formMsg(e.message, 'bad'); }
+  }
+
+  // ---------- typing a follower count by hand ----------
+  let manualFor = null;
+  function openManual(a, p) {
+    manualFor = { a, p };
+    const f = $('#manual-form'), d = new Date().toISOString().slice(0, 10);
+    const existing = snapsOf(a.id, p).find((s) => s.d === d);
+    $('#manual-title').textContent = `${a.name} · ${PNAME[p]}`;
+    f.elements.date.value = d; f.elements.date.max = d;
+    f.elements.followers.value = existing ? IN.format(existing.f) : '';
+    $('#manual-remove').hidden = !(existing && existing.m);
+    $('#manual-err').hidden = true;
+    $('#manual').showModal(); f.elements.followers.focus();
+  }
+  async function saveManual(method) {
+    const f = $('#manual-form');
+    try {
+      state.data = await api('snapshots', { method, body: { account: manualFor.a.id, platform: manualFor.p, date: f.elements.date.value, followers: f.elements.followers.value } });
+      $('#manual').close(); render();
+    } catch (e) { const m = $('#manual-err'); m.textContent = e.message; m.hidden = false; }
   }
 
   // ---------- page ----------
@@ -493,6 +522,15 @@
     $$('[data-period]').forEach((b) => b.addEventListener('click', () => { state.period = b.dataset.period; render(); }));
     $('#refresh').addEventListener('click', async () => { try { state.data = await api('refresh', { method: 'POST', body: {} }); render(); } catch (e) { alert(e.message); } });
     $('#schedule').addEventListener('change', async (e) => { try { state.data = await api('settings', { method: 'PUT', body: { schedule: e.target.value } }); render(); } catch (x) { alert(x.message); } });
+    $('#manual-form').addEventListener('submit', (e) => { e.preventDefault(); saveManual('POST'); });
+    $('#manual-cancel').addEventListener('click', () => $('#manual').close());
+    $('#manual-remove').addEventListener('click', () => saveManual('DELETE'));
+    $('#manual-form').elements.date.addEventListener('change', (e) => {
+      if (!manualFor) return;
+      const s = snapsOf(manualFor.a.id, manualFor.p).find((x) => x.d === e.target.value);
+      $('#manual-remove').hidden = !(s && s.m);
+      if (s) $('#manual-form').elements.followers.value = IN.format(s.f);
+    });
     $('#form-cancel').addEventListener('click', () => { resetForm(); formMsg(''); });
     $('#acct-form').addEventListener('submit', async (e) => {
       e.preventDefault(); const f = e.target;

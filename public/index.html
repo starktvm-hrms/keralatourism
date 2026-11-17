@@ -130,6 +130,24 @@
       </div>
     </section>
 
+    <dialog class="kt-dialog" id="manual">
+      <form method="dialog" class="kt-stack" id="manual-form">
+        <h3 id="manual-title">Enter followers</h3>
+        <p class="kt-note" id="manual-note">Use this when a fetch could not get the number. A later successful fetch for the same day replaces it.</p>
+        <label class="kt-field">Followers
+          <input name="followers" inputmode="numeric" autocomplete="off" required placeholder="e.g. 8,68,656">
+        </label>
+        <label class="kt-field">Date
+          <input name="date" type="date" required>
+        </label>
+        <p class="kt-msg bad" id="manual-err" hidden></p>
+        <div class="kt-form-actions">
+          <button class="kt-primary" type="submit" value="save">Save</button>
+          <button class="kt-ghost" type="button" id="manual-cancel">Cancel</button>
+          <button class="kt-ghost" type="button" id="manual-remove" hidden>Remove this entry</button>
+        </div>
+      </form>
+    </dialog>
     <p class="kt-foot">Follower counts are fetched from public profiles with Apify. History starts from the first fetch.</p>
   </div>
 </div>

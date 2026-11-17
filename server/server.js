@@ -291,6 +291,29 @@ async function handle(req, res) {
     store.write('snapshots', store.read('snapshots', []).filter((s) => s.a !== m[1]));
     return send(res, 200, dataPayload());
   }
+  // Enter a follower count by hand (when a fetch could not get it). One value per account,
+  // platform and day; a later successful fetch for the same day replaces it.
+  if (p === '/api/snapshots' && (req.method === 'POST' || req.method === 'DELETE')) {
+    const { account, platform, date, followers } = await readBody(req);
+    const a = store.read('accounts', []).find((x) => x.id === account);
+    if (!a) return send(res, 404, { error: 'Account not found' });
+    if (!PLATFORMS.includes(platform) || !a.handles[platform]) return send(res, 400, { error: 'This account has no username on that platform' });
+    const d = String(date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(Date.parse(d)) || d > today() || d < '2000-01-01') return send(res, 400, { error: 'Pick a date that is not in the future' });
+    const snaps = store.read('snapshots', []);
+    const i = snaps.findIndex((s) => s.a === a.id && s.p === platform && s.d === d);
+    if (req.method === 'DELETE') {
+      if (i < 0 || !snaps[i].m) return send(res, 400, { error: 'Only values entered by hand can be removed' });
+      snaps.splice(i, 1);
+    } else {
+      const f = Number(String(followers ?? '').replace(/[,\s]/g, ''));
+      if (!Number.isInteger(f) || f < 0 || f > 5e9) return send(res, 400, { error: 'Enter the number of followers as a whole number' });
+      const row = { d, a: a.id, p: platform, f, m: 1, by: email };
+      if (i >= 0) snaps[i] = row; else snaps.push(row);
+    }
+    store.write('snapshots', snaps);
+    return send(res, 200, dataPayload());
+  }
   if (p === '/api/settings' && req.method === 'PUT') {
     const { schedule } = await readBody(req);
     if (!['off', 'daily', 'weekly'].includes(schedule)) return send(res, 400, { error: 'Schedule must be off, daily or weekly' });
