@@ -1,32 +1,153 @@
 [
-  { "name": "Kerala Tourism", "group": "own", "handles": {
-    "instagram": "https://www.instagram.com/keralatourism/",
-    "facebook": "https://www.facebook.com/keralatourismofficial",
-    "x": "https://twitter.com/KeralaTourism" } },
-  { "name": "Australia", "group": "international", "handles": {
-    "instagram": "https://www.instagram.com/australia",
-    "facebook": "https://www.facebook.com/SeeAustralia",
-    "x": "https://x.com/Australia" } },
-  { "name": "Dubai", "group": "international", "handles": {
-    "instagram": "https://www.instagram.com/visit.dubai",
-    "facebook": "https://www.facebook.com/visitdubai/",
-    "x": "https://x.com/visitdubai" } },
-  { "name": "USA", "group": "international", "handles": {
-    "instagram": "https://www.instagram.com/visittheusa/",
-    "facebook": "https://www.facebook.com/VisitTheUSA",
-    "x": "https://x.com/VisitTheUSA" } },
-  { "name": "Singapore", "group": "international", "handles": {
-    "instagram": "https://www.instagram.com/visit_singapore/",
-    "facebook": "https://www.facebook.com/VisitSingaporeOfficial/",
-    "x": "https://x.com/VisitSingapore" } },
-  { "name": "Thailand", "group": "international", "handles": {
-    "instagram": "https://www.instagram.com/tourismthailand/",
-    "facebook": "https://www.facebook.com/AmazingThailand",
-    "x": "https://x.com/thailandfanclub" } },
-  { "name": "Indonesia", "group": "international", "handles": {
-    "instagram": "https://www.instagram.com/wonderfulindonesia/",
-    "facebook": "https://www.facebook.com/WonderfulIndonesia" } },
-  { "name": "Malaysia", "group": "international", "handles": {
-    "instagram": "https://www.instagram.com/malaysia.truly.asia",
-    "facebook": "https://www.facebook.com/malaysia.travel.my" } }
+ {
+  "name": "Kerala Tourism",
+  "group": "own",
+  "handles": {
+   "instagram": "https://www.instagram.com/keralatourism/",
+   "facebook": "https://www.facebook.com/keralatourismofficial",
+   "x": "https://twitter.com/KeralaTourism"
+  }
+ },
+ {
+  "name": "Australia",
+  "group": "international",
+  "handles": {
+   "instagram": "https://www.instagram.com/australia",
+   "facebook": "https://www.facebook.com/SeeAustralia",
+   "x": "https://x.com/Australia"
+  }
+ },
+ {
+  "name": "Dubai",
+  "group": "international",
+  "handles": {
+   "instagram": "https://www.instagram.com/visit.dubai",
+   "facebook": "https://www.facebook.com/visitdubai/",
+   "x": "https://x.com/visitdubai"
+  }
+ },
+ {
+  "name": "USA",
+  "group": "international",
+  "handles": {
+   "instagram": "https://www.instagram.com/visittheusa/",
+   "facebook": "https://www.facebook.com/VisitTheUSA",
+   "x": "https://x.com/VisitTheUSA"
+  }
+ },
+ {
+  "name": "Singapore",
+  "group": "international",
+  "handles": {
+   "instagram": "https://www.instagram.com/visit_singapore/",
+   "facebook": "https://www.facebook.com/VisitSingaporeOfficial/",
+   "x": "https://x.com/VisitSingapore"
+  }
+ },
+ {
+  "name": "Thailand",
+  "group": "international",
+  "handles": {
+   "instagram": "https://www.instagram.com/tourismthailand/",
+   "facebook": "https://www.facebook.com/AmazingThailand",
+   "x": "https://x.com/thailandfanclub"
+  }
+ },
+ {
+  "name": "Indonesia",
+  "group": "international",
+  "handles": {
+   "instagram": "https://www.instagram.com/wonderfulindonesia/",
+   "facebook": "https://www.facebook.com/WonderfulIndonesia"
+  }
+ },
+ {
+  "name": "Malaysia",
+  "group": "international",
+  "handles": {
+   "instagram": "https://www.instagram.com/malaysia.truly.asia",
+   "facebook": "https://www.facebook.com/malaysia.travel.my"
+  }
+ },
+ {
+  "name": "Incredible India Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/incredibleindia/",
+   "facebook": "https://www.facebook.com/incredibleindia",
+   "x": "https://x.com/incredibleindia"
+  }
+ },
+ {
+  "name": "Gujarat Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/gujarattourism/",
+   "facebook": "https://www.facebook.com/gujtourism",
+   "x": "https://x.com/GujaratTourism"
+  }
+ },
+ {
+  "name": "Madhya Pradesh Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/mptourism/",
+   "facebook": "https://www.facebook.com/MPTourism",
+   "x": "https://x.com/MPTourism"
+  }
+ },
+ {
+  "name": "Uttarakhand Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/uttarakhand_tourismofficial/",
+   "facebook": "https://www.facebook.com/UttarakhandTourismOfficialPage",
+   "x": "https://x.com/UTDBofficial"
+  }
+ },
+ {
+  "name": "Uttar Pradesh Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/uttarpradeshtourism/",
+   "facebook": "https://www.facebook.com/UttarPradeshTourism",
+   "x": "https://x.com/uptourismgov"
+  }
+ },
+ {
+  "name": "Goa Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/goatourism/",
+   "facebook": "https://www.facebook.com/officialgoatourism",
+   "x": "https://x.com/TourismGoa"
+  }
+ },
+ {
+  "name": "Rajasthan Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/rajasthan_tourism/",
+   "facebook": "https://www.facebook.com/rajasthantourism",
+   "x": "https://x.com/my_rajasthan"
+  }
+ },
+ {
+  "name": "Andhra Pradesh Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/andhrapradeshtourism/",
+   "facebook": "https://www.facebook.com/andhrapradeshtourism",
+   "x": "https://x.com/APTDCofficial"
+  }
+ },
+ {
+  "name": "Odisha Tourism",
+  "group": "domestic",
+  "handles": {
+   "instagram": "https://www.instagram.com/odishatourismofficial/",
+   "facebook": "https://www.facebook.com/OdishaTourismOfficial",
+   "x": "https://x.com/odisha_tourism"
+  }
+ }
 ]
