@@ -154,3 +154,15 @@ button.kt-tile { cursor: pointer; }
 .kt-dialog .kt-note { margin: 0; }
 .kt-dialog .kt-field input { font: inherit; font-size: var(--cds-font-size-body); color: var(--color-fg); background: var(--color-bg); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-sm) var(--cds-pad-md); color-scheme: inherit; }
 .kt-acct .kt-enter { display: block; text-align: right; margin-left: auto; color: var(--color-fg-muted); }
+/* monthly data table */
+.kt-monthly-wrap { max-height: 72vh; overflow: auto; padding: 0; }
+.kt-monthly { border-collapse: separate; border-spacing: 0; }
+.kt-monthly th { position: sticky; top: 0; background: var(--color-panel); z-index: 2; padding: var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); }
+.kt-monthly th.kt-mh { text-align: center; color: var(--color-fg); border-left: 1px solid var(--color-border-line); }
+.kt-monthly th:first-child, .kt-monthly td:first-child { position: sticky; left: 0; background: var(--color-panel); z-index: 1; padding-left: var(--cds-pad-lg); text-align: left; white-space: nowrap; }
+.kt-monthly th:first-child { z-index: 3; }
+.kt-monthly td { padding: var(--cds-pad-xs) var(--cds-pad-sm); }
+.kt-monthly td:nth-child(2n) { border-left: 1px solid var(--color-border-line); }
+.kt-monthly td:last-child, .kt-monthly th:last-child { padding-right: var(--cds-pad-lg); }
+.kt-monthly .kt-strong { font-weight: 600; }
+.kt-monthly tbody tr:hover td { background: color-mix(in srgb, var(--color-fg) 4%, var(--color-panel)); }

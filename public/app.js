@@ -27,6 +27,7 @@
   const state = {
     data: null, tab: 'own', period: 'monthly',
     ownPick: null, ownPlatform: 'all', compPlatform: { domestic: 'instagram', international: 'instagram' }, compOrder: 'asc',
+    monthlyPick: null, monthlyOrder: 'oldest',
     editing: null, poll: null,
   };
 
@@ -69,7 +70,7 @@
 
   // Map(periodKey -> followers): last value in each period. 'all' sums the platforms; a platform with no
   // value in a period keeps its last known value, so a missing month does not read as a drop.
-  function series(id, platform, period) {
+  function series(id, platform, period, unlimited = false) {
     const plats = platform === 'all' ? PLATFORMS : [platform];
     const per = plats.map((p) => { const m = new Map(); for (const s of snapsOf(id, p)) m.set(periodKey[period](s.d), s.f); return m; }).filter((m) => m.size);
     const keys = [...new Set(per.flatMap((m) => [...m.keys()]))].sort();
@@ -78,7 +79,7 @@
       let cur = null;
       for (const k of keys) { if (m.has(k)) cur = m.get(k); if (cur != null) total.set(k, (total.get(k) || 0) + cur); }
     }
-    const lim = { daily: 90, monthly: 24, yearly: 10 }[period];
+    const lim = unlimited ? Infinity : { daily: 90, monthly: 24, yearly: 10 }[period];
     return new Map(keys.filter((k) => total.has(k)).slice(-lim).map((k) => [k, total.get(k)]));
   }
   // growth per period vs the previous period in the series
@@ -377,6 +378,65 @@
     else rankChart($('#' + gid), { items: gItems, fmt: (v) => fmtP(v), axisFmt: (v) => d3.format('.1f')(v) + '%', yTitle: 'Growth %', xTitle, order: state.compOrder });
   }
 
+  // ---------- tab: monthly data (one row per month, like the comparison sheet) ----------
+  const monthName = (k) => d3.utcFormat('%b %Y')(toDate(k));
+  function monthlyTable(acct) {
+    const plats = platformsOf(acct);
+    const per = new Map(plats.map((p) => [p, series(acct.id, p, 'monthly', true)]));
+    const total = series(acct.id, 'all', 'monthly', true);
+    const months = [...total.keys()].sort();
+    const prev = new Map();
+    const rows = months.map((k) => {
+      const cells = plats.map((p) => {
+        const v = per.get(p).get(k);
+        let pct = null;
+        if (v != null) { const pv = prev.get(p); pct = pv ? ((v - pv) / pv) * 100 : null; prev.set(p, v); }
+        return { v, pct };
+      });
+      return { k, cells, total: total.get(k) };
+    });
+    return { plats, rows };
+  }
+  function downloadCsv(acct, t) {
+    const head = ['Month', ...t.plats.flatMap((p) => [PNAME[p] + ' followers', PNAME[p] + ' % growth']), 'Total followers'];
+    const lines = [head.join(',')];
+    for (const r of t.rows) lines.push([r.k, ...r.cells.flatMap((c) => [c.v ?? '', c.pct == null ? '' : c.pct.toFixed(2)]), r.total].join(','));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/csv' }));
+    a.download = `${acct.name.replace(/[^\w]+/g, '-')}-monthly-followers.csv`;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function renderMonthly() {
+    const box = $('#tab-monthly'); box.replaceChildren();
+    const all = state.data.accounts;
+    if (!all.length) return box.append(emptyState('No accounts yet.', 'Add accounts'));
+    if (!all.find((a) => a.id === state.monthlyPick)) state.monthlyPick = (accounts('own')[0] || all[0]).id;
+    const acct = all.find((a) => a.id === state.monthlyPick);
+    const sel = el('select', { class: 'kt-select', 'aria-label': 'Account', onchange: (e) => { state.monthlyPick = e.target.value; renderMonthly(); } },
+      ['own', 'domestic', 'international'].filter((g) => accounts(g).length).map((g) => el('optgroup', { label: GROUP_NAME[g] }, accounts(g).map((a) => el('option', { value: a.id, selected: a.id === acct.id, text: a.name })))));
+    const t = monthlyTable(acct);
+    box.append(el('div', { class: 'kt-row' }, el('span', { class: 'kt-label', text: 'Account' }), sel,
+      el('span', { class: 'kt-label', text: 'Order' }),
+      el('div', { class: 'kt-seg' }, [['oldest', 'Oldest first'], ['newest', 'Newest first']].map(([v, txt]) => el('button', { type: 'button', 'aria-pressed': String(state.monthlyOrder === v), text: txt, onclick: () => { state.monthlyOrder = v; renderMonthly(); } }))),
+      t.rows.length ? el('button', { class: 'kt-ghost', type: 'button', text: 'Download CSV', onclick: () => downloadCsv(acct, t) }) : null));
+    if (!t.rows.length) return box.append(emptyState(`No follower counts for ${acct.name} yet.`));
+    const first = t.rows[0].k, last = t.rows[t.rows.length - 1].k;
+    box.append(el('p', { class: 'kt-note', text: `${acct.name}, ${monthName(first)} to ${monthName(last)}: the last recorded count in each month, and its change from the previous month with a value. Total carries a platform's last count forward through months without one.` }));
+    const tr1 = el('tr', {}, el('th', { rowspan: 2, text: 'Month' }), t.plats.map((p) => el('th', { colspan: 2, class: 'kt-mh', text: PNAME[p] })), el('th', { rowspan: 2, text: 'Total' }));
+    const tr2 = el('tr', {}, t.plats.flatMap(() => [el('th', { text: 'Followers' }), el('th', { text: '% growth' })]));
+    const tb = el('tbody');
+    const ordered = state.monthlyOrder === 'newest' ? [...t.rows].reverse() : t.rows;
+    for (const r of ordered) {
+      tb.append(el('tr', {}, el('td', { text: monthName(r.k) }),
+        r.cells.flatMap((c) => [el('td', { text: fmtN(c.v) }), el('td', { class: cls(c.pct), text: fmtP(c.pct) })]),
+        el('td', { class: 'kt-strong', text: fmtN(r.total) })));
+    }
+    const wrap = el('div', { class: 'kt-card kt-monthly-wrap' }, el('table', { class: 'kt-table kt-monthly' }, el('thead', {}, tr1, tr2), tb));
+    box.append(wrap);
+    const h1 = tr1.getBoundingClientRect().height; // second header row sticks just under the first
+    tr2.querySelectorAll('th').forEach((th) => { th.style.top = h1 + 'px'; });
+  }
+
   // ---------- tab: accounts ----------
   function lastResult(id, p) {
     const r = state.data.lastRun?.results?.find((x) => x.account === id && x.platform === p);
@@ -469,7 +529,7 @@
     state.tab = t;
     $$('[data-page]').forEach((s) => { s.hidden = s.dataset.page !== t; });
     $$('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
-    $('#period').hidden = t === 'accounts';
+    $('#period').hidden = t === 'accounts' || t === 'monthly';
     try { history.replaceState(null, '', '#' + t); } catch (e) {}
     render();
   }
@@ -498,6 +558,7 @@
     renderStatus();
     if (state.tab === 'own') renderOwn();
     else if (state.tab === 'accounts') renderAccounts();
+    else if (state.tab === 'monthly') renderMonthly();
     else renderComp(state.tab);
     clearTimeout(state.poll);
     if (state.data.running) state.poll = setTimeout(load, 8000);
@@ -508,7 +569,7 @@
   async function showApp(email) {
     $('#login').hidden = true; $('#app').hidden = false; $('#who').textContent = email;
     const want = location.hash.slice(1);
-    state.tab = ['own', 'domestic', 'international', 'accounts'].includes(want) ? want : 'own';
+    state.tab = ['own', 'domestic', 'international', 'monthly', 'accounts'].includes(want) ? want : 'own';
     await load(); openTab(state.tab);
   }
 
