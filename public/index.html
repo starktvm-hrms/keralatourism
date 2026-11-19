@@ -77,7 +77,7 @@
     <section id="tab-accounts" data-page="accounts" hidden>
       <div class="kt-card">
         <h3 id="form-title">Add an account</h3>
-        <p class="kt-note">Type usernames or paste profile links. Leave a platform empty if the account isn't on it.</p>
+        <p class="kt-note">Type usernames or paste profile links. Leave a platform empty if the account isn't on it. LinkedIn and Pinterest are not fetched automatically: their counts are entered by hand.</p>
         <form class="kt-form" id="acct-form">
           <label class="kt-field">Name
             <input name="name" required maxlength="80" placeholder="e.g. Goa Tourism">
@@ -100,6 +100,12 @@
           </label>
           <label class="kt-field">X (Twitter) username
             <input name="x" placeholder="KeralaTourism">
+          </label>
+          <label class="kt-field">LinkedIn page
+            <input name="linkedin" placeholder="linkedin.com/company/…">
+          </label>
+          <label class="kt-field">Pinterest username
+            <input name="pinterest" placeholder="pinterest.com/…">
           </label>
           <div class="kt-form-actions">
             <button class="kt-primary" type="submit" id="form-save">Add account</button>
@@ -148,7 +154,8 @@
         </div>
       </form>
     </dialog>
-    <p class="kt-foot">Follower counts are fetched from public profiles with Apify. History starts from the first fetch.</p>
+    <p class="kt-foot">Instagram, Facebook, YouTube and X counts are fetched from public profiles with Apify; LinkedIn and Pinterest counts are entered by hand.</p>
+    <p class="kt-foot" id="history-note" hidden></p>
   </div>
 </div>
 </body>

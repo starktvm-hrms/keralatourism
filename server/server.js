@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const store = require('./store');
-const { PLATFORMS, normalize, urlFor, scrapers } = require('./apify');
+const { PLATFORMS, SCRAPED, normalize, urlFor, scrapers } = require('./apify');
 
 const PORT = Number(process.env.PORT || 3107);
 const HOST = process.env.HOST || '127.0.0.1';
@@ -79,7 +79,9 @@ function cleanAccount(body, existing = {}) {
     if (h && !/^[\w.@\/-]{1,120}$/.test(h)) throw new Error(`The ${p} username doesn't look right`);
     if (h) handles[p] = h;
   }
-  if (!Object.keys(handles).length) throw new Error('Add at least one username');
+  // an account that only holds imported history may have no username at all
+  const hasHistory = existing.id && store.read('snapshots', []).some((s) => s.a === existing.id);
+  if (!Object.keys(handles).length && !hasHistory) throw new Error('Add at least one username');
   return { name, group, handles };
 }
 
@@ -92,7 +94,7 @@ async function scrapeAll(trigger) {
     const accounts = store.read('accounts', []);
     const started = new Date().toISOString();
     const results = [];
-    for (const p of PLATFORMS) {
+    for (const p of SCRAPED) {
       const handles = [...new Set(accounts.map((a) => a.handles[p]).filter(Boolean))];
       if (!handles.length) continue;
       // First try every handle; then immediately retry only the ones that came back
@@ -192,6 +194,43 @@ if (!getSettings().lastScheduled) store.write('settings', { ...getSettings(), la
   if (added) console.log(`[seed] added ${added} account(s) or usernames`);
 })();
 
+// Follower history from earlier records (server/history/*.json) is loaded once per file id:
+// values go to the named account (created without usernames if missing), flagged h:1.
+// A day that already has a value is left alone, and nothing is re-added after a delete.
+(function importHistory() {
+  const dir = path.join(__dirname, 'history');
+  let files;
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort(); } catch (e) { return; }
+  const key = (g, n) => g + ':' + String(n).trim().toLowerCase();
+  for (const f of files) {
+    let h;
+    try { h = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch (e) { console.error('[history]', f, e.message); continue; }
+    const done = new Set(getSettings().historyImported || []);
+    if (!h.id || done.has(h.id)) continue;
+    const accounts = store.read('accounts', []), snaps = store.read('snapshots', []);
+    const have = new Set(snaps.map((s) => `${s.a}|${s.p}|${s.d}`));
+    let added = 0, created = 0;
+    for (const acc of h.accounts || []) {
+      if (!GROUPS.includes(acc.group) || !acc.name) continue;
+      let a = accounts.find((x) => key(x.group, x.name) === key(acc.group, acc.name));
+      if (!a) { a = { id: crypto.randomBytes(6).toString('hex'), name: String(acc.name).trim().slice(0, 80), group: acc.group, handles: {}, created: new Date().toISOString() }; accounts.push(a); created++; }
+      for (const [p, rows] of Object.entries(acc.series || {})) {
+        if (!PLATFORMS.includes(p) || !Array.isArray(rows)) continue;
+        for (const [d, v] of rows) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d)) || !Number.isFinite(v) || v < 0 || have.has(`${a.id}|${p}|${d}`)) continue;
+          have.add(`${a.id}|${p}|${d}`); snaps.push({ d, a: a.id, p, f: Math.round(v), h: 1 }); added++;
+        }
+      }
+    }
+    snaps.sort((x, y) => x.d.localeCompare(y.d));
+    store.write('accounts', accounts);
+    store.write('snapshots', snaps);
+    const s = getSettings();
+    store.write('settings', { ...s, historyImported: [...done, h.id], history: [...(s.history || []), { id: h.id, source: h.source || f, at: new Date().toISOString() }] });
+    console.log(`[history] ${f}: ${added} value(s) added, ${created} account(s) created`);
+  }
+})();
+
 // schedule: checked every 30 minutes
 function scheduleDue() {
   const s = getSettings();
@@ -250,7 +289,7 @@ function dataPayload() {
   return {
     accounts: accounts.map((a) => ({ ...a, urls: Object.fromEntries(Object.entries(a.handles).map(([p, h]) => [p, urlFor[p](h)])) })),
     snapshots: store.read('snapshots', []).filter((s) => ids.has(s.a)),
-    settings: { schedule: getSettings().schedule },
+    settings: { schedule: getSettings().schedule, history: getSettings().history || [] },
     lastRun: store.read('lastRun', null),
     running: !!running,
   };
@@ -318,7 +357,8 @@ async function handle(req, res) {
     const { account, platform, date, followers } = await readBody(req);
     const a = store.read('accounts', []).find((x) => x.id === account);
     if (!a) return send(res, 404, { error: 'Account not found' });
-    if (!PLATFORMS.includes(platform) || !a.handles[platform]) return send(res, 400, { error: 'This account has no username on that platform' });
+    const onPlatform = PLATFORMS.includes(platform) && (a.handles[platform] || store.read('snapshots', []).some((s) => s.a === a.id && s.p === platform));
+    if (!onPlatform) return send(res, 400, { error: 'This account has no username on that platform' });
     const d = String(date || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(Date.parse(d)) || d > today() || d < '2000-01-01') return send(res, 400, { error: 'Pick a date that is not in the future' });
     const snaps = store.read('snapshots', []);

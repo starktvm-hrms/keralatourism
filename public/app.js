@@ -1,8 +1,10 @@
 /* Kerala Tourism social dashboard — page script. Data comes from the server's /api. */
 'use strict';
 (() => {
-  const PLATFORMS = ['instagram', 'facebook', 'youtube', 'x'];
-  const PNAME = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', x: 'X (Twitter)', all: 'All platforms' };
+  const SCRAPED = ['instagram', 'facebook', 'youtube', 'x']; // fetched through Apify
+  const PLATFORMS = [...SCRAPED, 'linkedin', 'pinterest'];
+  const PNAME = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', x: 'X (Twitter)', linkedin: 'LinkedIn', pinterest: 'Pinterest', all: 'All platforms' };
+  const SHORT = { ...PNAME, x: 'X' };
   const GROUP_NAME = { own: 'Your accounts', domestic: 'Domestic competitors', international: 'International competitors' };
   const H = 260;
 
@@ -62,19 +64,22 @@
     return state.data.snapshots.filter((s) => s.a === id && (platform === 'all' || s.p === platform)).sort((a, b) => a.d.localeCompare(b.d));
   }
   const periodKey = { daily: (d) => d, monthly: (d) => d.slice(0, 7), yearly: (d) => d.slice(0, 4) };
+  // platforms an account is on: it has a username there, or follower counts (imported history or typed in)
+  const platformsOf = (a) => PLATFORMS.filter((p) => a.handles[p] || state.data.snapshots.some((s) => s.a === a.id && s.p === p));
 
-  // Map(periodKey -> followers): last value in each period; 'all' sums platforms (each platform's last value in that period)
+  // Map(periodKey -> followers): last value in each period. 'all' sums the platforms; a platform with no
+  // value in a period keeps its last known value, so a missing month does not read as a drop.
   function series(id, platform, period) {
     const plats = platform === 'all' ? PLATFORMS : [platform];
+    const per = plats.map((p) => { const m = new Map(); for (const s of snapsOf(id, p)) m.set(periodKey[period](s.d), s.f); return m; }).filter((m) => m.size);
+    const keys = [...new Set(per.flatMap((m) => [...m.keys()]))].sort();
     const total = new Map();
-    for (const p of plats) {
-      const m = new Map();
-      for (const s of snapsOf(id, p)) m.set(periodKey[period](s.d), s.f);
-      for (const [k, v] of m) total.set(k, (total.get(k) || 0) + v);
+    for (const m of per) {
+      let cur = null;
+      for (const k of keys) { if (m.has(k)) cur = m.get(k); if (cur != null) total.set(k, (total.get(k) || 0) + cur); }
     }
-    const keys = [...total.keys()].sort();
     const lim = { daily: 90, monthly: 24, yearly: 10 }[period];
-    return new Map(keys.slice(-lim).map((k) => [k, total.get(k)]));
+    return new Map(keys.filter((k) => total.has(k)).slice(-lim).map((k) => [k, total.get(k)]));
   }
   // growth per period vs the previous period in the series
   function growth(ser) {
@@ -276,10 +281,10 @@
     if (!state.data.snapshots.some((s) => s.a === acct.id)) return box.append(emptyState(`No follower counts for ${acct.name} yet. Click “Refresh now” to fetch them.`));
 
     const L = latest(acct.id, 'all');
-    box.append(el('p', { class: 'kt-note', text: `${acct.name} · latest fetch ${L.date ? fmtDay(toDate(L.date)) : '—'}. Pick a platform to chart it. Changes compare with about 30 days and 12 months earlier, once there is that much history.` }));
+    box.append(el('p', { class: 'kt-note', text: `${acct.name} · latest figures ${L.date ? fmtDay(toDate(L.date)) : '—'}. Pick a platform to chart it. Changes compare with about 30 days and 12 months earlier.` }));
     const tiles = el('div', { class: 'kt-tiles' });
-    for (const p of ['all', ...PLATFORMS]) {
-      if (p !== 'all' && !acct.handles[p]) continue;
+    const mine = platformsOf(acct);
+    for (const p of ['all', ...mine]) {
       const v = latest(acct.id, p);
       tiles.append(el('button', { type: 'button', class: 'kt-tile', 'aria-pressed': String(state.ownPlatform === p), onclick: () => { state.ownPlatform = p; renderOwn(); } },
         el('span', { class: 'kt-tile-name', text: PNAME[p] }),
@@ -287,15 +292,15 @@
         el('span', { class: 'kt-delta' }, el('span', { class: cls(v.mom), text: fmtP(v.mom) }), ' 30 days · ', el('span', { class: cls(v.yoy), text: fmtP(v.yoy) }), ' 1 year')));
     }
     box.append(tiles);
-    if (state.ownPlatform !== 'all' && !acct.handles[state.ownPlatform]) state.ownPlatform = 'all';
+    if (state.ownPlatform !== 'all' && !mine.includes(state.ownPlatform)) state.ownPlatform = 'all';
     const plat = state.ownPlatform, per = state.period;
     box.append(el('div', { class: 'kt-grid2' }, card('own-f', `Follower count · ${PNAME[plat]}`, PERIOD_NOTE.followers[per]), card('own-g', `Follower growth · ${PNAME[plat]}`, PERIOD_NOTE.net[per])));
     // table
     const tb = el('tbody');
-    for (const p of [...PLATFORMS.filter((q) => acct.handles[q]), 'all']) {
+    for (const p of [...mine, 'all']) {
       const v = latest(acct.id, p);
       tb.append(el('tr', { class: p === 'all' ? 'kt-total kt-hl' : null },
-        el('td', {}, p === 'all' ? PNAME[p] : el('a', { href: acct.urls[p], target: '_blank', rel: 'noopener', text: PNAME[p] })),
+        el('td', {}, p === 'all' || !acct.urls[p] ? PNAME[p] : el('a', { href: acct.urls[p], target: '_blank', rel: 'noopener', text: PNAME[p] })),
         el('td', { text: fmtN(v.value) }), el('td', { class: cls(v.mom), text: fmtP(v.mom) }), el('td', { class: cls(v.yoy), text: fmtP(v.yoy) })));
     }
     box.append(el('div', { class: 'kt-card' }, el('h3', { text: 'Platform breakdown' }), el('p', { class: 'kt-note', text: `${acct.name} followers by platform.` }),
@@ -318,10 +323,10 @@
     if (!comps.length) return box.append(emptyState(`No ${group} competitors yet.`, `Add ${group} competitors`));
     const plat = state.compPlatform[group], per = state.period;
     box.append(el('div', { class: 'kt-row' }, el('span', { class: 'kt-label', text: 'Platform' }),
-      el('div', { class: 'kt-seg' }, [...PLATFORMS, 'all'].map((p) => el('button', { type: 'button', 'aria-pressed': String(p === plat), text: p === 'x' ? 'X' : PNAME[p], onclick: () => { state.compPlatform[group] = p; renderComp(group); } }))),
+      el('div', { class: 'kt-seg' }, [...PLATFORMS.filter((p) => SCRAPED.includes(p) || [...own.slice(0, 1), ...comps].some((a) => platformsOf(a).includes(p))), 'all'].map((p) => el('button', { type: 'button', 'aria-pressed': String(p === plat), text: SHORT[p], onclick: () => { state.compPlatform[group] = p; renderComp(group); } }))),
       el('span', { class: 'kt-label', text: 'Order' }),
       el('div', { class: 'kt-seg' }, [['asc', 'Ascending'], ['desc', 'Descending']].map(([v, t]) => el('button', { type: 'button', 'aria-pressed': String(state.compOrder === v), text: t, onclick: () => { state.compOrder = v; renderComp(group); } })))));
-    const boards = [...own.slice(0, 1), ...comps].filter((a) => plat === 'all' || a.handles[plat]);
+    const boards = [...own.slice(0, 1), ...comps].filter((a) => plat === 'all' || platformsOf(a).includes(plat));
     const color = new Map(boards.map((a) => [a.id, a.group === 'own' ? 'var(--kt-own)' : 'var(--kt-bar)']));
     const withData = boards.filter((a) => latest(a.id, plat).value != null);
     if (!withData.length) return box.append(emptyState(`No ${PNAME[plat]} follower counts yet for these accounts. Click “Refresh now” to fetch them.`));
@@ -347,15 +352,16 @@
       card(fid, `Follower count · ${PNAME[plat]}`, `Followers at the latest fetch (${fmtDay(toDate(asOf))}), ${orderTxt}. Kerala Tourism is highlighted.`),
       card(gid, `Growth rate · ${PNAME[plat]}`, `Follower growth % in the latest ${per === 'daily' ? 'fetch' : per === 'monthly' ? 'month' : 'year'} compared with ${prevTxt}, ${orderTxt}.`)));
     // table: every platform
-    const tb = el('tbody');
-    for (const a of [...own.slice(0, 1), ...comps]) {
+    const tb = el('tbody'), rowsAll = [...own.slice(0, 1), ...comps];
+    const cols = PLATFORMS.filter((p) => rowsAll.some((a) => platformsOf(a).includes(p)));
+    for (const a of rowsAll) {
       const tot = latest(a.id, 'all');
       tb.append(el('tr', { class: a.group === 'own' ? 'kt-hl' : null }, el('td', { text: a.name }),
-        PLATFORMS.map((p) => el('td', {}, a.handles[p] ? el('a', { href: a.urls[p], target: '_blank', rel: 'noopener', text: fmtN(latest(a.id, p).value) }) : '—')),
+        cols.map((p) => el('td', {}, !platformsOf(a).includes(p) ? '—' : a.urls[p] ? el('a', { href: a.urls[p], target: '_blank', rel: 'noopener', text: fmtN(latest(a.id, p).value) }) : fmtN(latest(a.id, p).value))),
         el('td', { text: fmtN(tot.value) }), el('td', { class: cls(tot.yoy), text: fmtP(tot.yoy) })));
     }
     box.append(el('div', { class: 'kt-card' }, el('h3', { text: 'Followers by platform' }), el('p', { class: 'kt-note', text: 'Latest count for every account on every platform; 1 year compares total followers with about 12 months earlier.' }),
-      el('div', { class: 'kt-tablewrap' }, el('table', { class: 'kt-table' }, el('thead', {}, el('tr', {}, ['Account', 'Instagram', 'Facebook', 'YouTube', 'X', 'Total', '1 year'].map((t) => el('th', { text: t })))), tb))));
+      el('div', { class: 'kt-tablewrap' }, el('table', { class: 'kt-table' }, el('thead', {}, el('tr', {}, ['Account', ...cols.map((p) => SHORT[p]), 'Total', '1 year'].map((t) => el('th', { text: t })))), tb))));
 
     const xTitle = (group === 'domestic' ? 'Domestic' : 'International') + ' Tourism Departments';
     rankChart($('#' + fid), {
@@ -382,27 +388,29 @@
       const list = accounts(g);
       if (!list.length) { box.append(el('p', { class: 'kt-hint', text: 'None yet — add one with the form above.' })); continue; }
       const tb = el('tbody');
+      const cols = PLATFORMS.filter((p) => SCRAPED.includes(p) || list.some((a) => platformsOf(a).includes(p)));
       for (const a of list) {
         tb.append(el('tr', {},
           el('td', { text: a.name }),
-          PLATFORMS.map((p) => {
-            if (!a.handles[p]) return el('td', { text: '—' });
-            const err = lastResult(a.id, p), ss = snapsOf(a.id, p), last = ss[ss.length - 1];
+          cols.map((p) => {
+            const ss = snapsOf(a.id, p), last = ss[ss.length - 1];
+            if (!a.handles[p] && !last) return el('td', { text: '—' });
+            const err = lastResult(a.id, p);
             const runDay = state.data.lastRun ? state.data.lastRun.finished.slice(0, 10) : null;
             const failedNow = err && !(last && runDay && last.d >= runDay); // a value for that day (e.g. typed in) covers the failure
             const parts = [];
-            if (last) parts.push(el('span', { class: 'kt-small', text: fmtN(last.f) + (last.m ? ' · entered ' + fmtDay(toDate(last.d)) : '') }));
+            if (last) parts.push(el('span', { class: 'kt-small', text: fmtN(last.f) + (last.m ? ' · entered ' + fmtDay(toDate(last.d)) : last.h ? ' · imported, ' + fmtDay(toDate(last.d)) : '') }));
             if (failedNow) parts.push(el('span', { class: 'kt-small kt-bad', text: 'Last fetch failed', title: err }));
             else if (!last) parts.push(el('span', { class: 'kt-small', text: 'Not fetched yet' }));
             parts.push(el('button', { class: 'kt-link kt-small kt-enter', type: 'button', text: failedNow || !last ? 'Enter value' : 'Edit value', onclick: () => openManual(a, p) }));
-            return el('td', {}, el('a', { href: a.urls[p], target: '_blank', rel: 'noopener', text: a.handles[p] }), parts);
+            return el('td', {}, a.handles[p] ? el('a', { href: a.urls[p], target: '_blank', rel: 'noopener', text: a.handles[p] }) : el('span', { class: 'kt-small', text: SCRAPED.includes(p) ? 'No username (history only)' : 'Entered by hand' }), parts);
           }),
           el('td', {}, el('div', { class: 'kt-actions' },
             el('button', { class: 'kt-ghost', type: 'button', text: 'Edit', onclick: () => editAccount(a) }),
             el('button', { class: 'kt-ghost', type: 'button', text: 'Delete', onclick: () => deleteAccount(a) })))));
       }
       box.append(el('div', { class: 'kt-card kt-tablewrap' }, el('table', { class: 'kt-table kt-acct' },
-        el('thead', {}, el('tr', {}, ['Name', 'Instagram', 'Facebook', 'YouTube', 'X', ''].map((t) => el('th', { text: t })))), tb)));
+        el('thead', {}, el('tr', {}, ['Name', ...cols.map((p) => SHORT[p]), ''].map((t) => el('th', { text: t })))), tb)));
     }
     $('#schedule').value = state.data.settings.schedule;
     const run = state.data.lastRun, lr = $('#last-run'); lr.replaceChildren();
@@ -471,6 +479,12 @@
     else if (d.lastRun) s.append(`Last updated ${fmtDay(new Date(d.lastRun.finished))}. Next: ${d.settings.schedule === 'off' ? 'when you click Refresh now' : d.settings.schedule}.`);
     else s.append('No follower counts fetched yet.');
     $('#refresh').disabled = d.running || !d.accounts.length;
+    const hn = $('#history-note'), hs = d.snapshots.filter((s) => s.h);
+    hn.hidden = !hs.length;
+    if (hs.length) {
+      const lo = d3.min(hs, (s) => s.d), hi = d3.max(hs, (s) => s.d);
+      hn.textContent = `Figures from ${d3.utcFormat('%b %Y')(toDate(lo))} to ${d3.utcFormat('%b %Y')(toDate(hi))} are imported from ${(d.settings.history || []).map((h) => h.source).join('; ') || 'an earlier record'}.`;
+    }
     const own = accounts('own')[0], t = $('#takeaway'); t.replaceChildren();
     if (own) {
       const v = latest(own.id, 'all');

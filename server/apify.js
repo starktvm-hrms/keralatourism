@@ -10,7 +10,8 @@ const ACTORS = {
   youtube: 'streamers~youtube-channel-scraper',
   x: 'apidojo~twitter-user-scraper',
 };
-const PLATFORMS = Object.keys(ACTORS);
+const SCRAPED = Object.keys(ACTORS); // fetched through Apify
+const PLATFORMS = [...SCRAPED, 'linkedin', 'pinterest']; // LinkedIn and Pinterest: history and hand-entered values only
 
 // ---- Turning what people type into one clean handle per platform ----
 function stripUrl(v, hosts) {
@@ -29,6 +30,12 @@ const normalize = {
     if (/^profile\.php/i.test(s)) return s; // numeric profile pages keep their query-less id form
     return s.split('/')[0].replace(/^@/, '');
   },
+  linkedin: (v) => {
+    const s = stripUrl(v, 'linkedin\\.com').replace(/^@/, '');
+    if (!s) return '';
+    return /^(company|in|school|showcase)\//i.test(s) ? s.split('/').slice(0, 2).join('/') : 'company/' + s.split('/')[0];
+  },
+  pinterest: (v) => stripUrl(v, '(?:[a-z]{2,3}\\.)?pinterest\\.[a-z.]+').split('/')[0].replace(/^@/, '').toLowerCase(),
   youtube: (v) => {
     let s = stripUrl(v, 'youtube\\.com');
     if (/^(channel|user|c)\//i.test(s)) return s.split('/').slice(0, 2).join('/');
@@ -43,6 +50,8 @@ const urlFor = {
   facebook: (h) => 'https://www.facebook.com/' + h,
   youtube: (h) => 'https://www.youtube.com/' + h,
   x: (h) => 'https://x.com/' + h,
+  linkedin: (h) => 'https://www.linkedin.com/' + h + '/',
+  pinterest: (h) => 'https://www.pinterest.com/' + h + '/',
 };
 
 function toNumber(v) {
@@ -136,4 +145,4 @@ for (const [p, fn] of Object.entries(scrapers)) {
   };
 }
 
-module.exports = { PLATFORMS, normalize, urlFor, scrapers };
+module.exports = { PLATFORMS, SCRAPED, normalize, urlFor, scrapers };

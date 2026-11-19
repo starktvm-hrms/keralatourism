@@ -4,7 +4,9 @@ Live at https://kt.starkpeople.in (sign-in required).
 
 Tracks follower counts for Kerala Tourism's social media accounts and for
 domestic and international competitor tourism boards, on Instagram,
-Facebook, YouTube and X. Counts are fetched from public profiles with
+Facebook, YouTube and X (fetched), plus LinkedIn and Pinterest (entered by hand).
+Kerala Tourism's own history from Aug 2018 is imported from the
+"Kerala Tourism SM Comparison - AHIL" sheet. Counts are fetched from public profiles with
 Apify on a schedule (weekly, daily or manual) and kept as history, so the
 monthly and yearly charts fill in from the first fetch onwards.
 
@@ -18,6 +20,8 @@ monthly and yearly charts fill in from the first fetch onwards.
 - `server/apify.js` — Apify actors used and how usernames are read
 - `server/store.js` — JSON files in `DATA_DIR`
 - `server/add-user.js` — add or remove a login from the command line
+- `server/history/*.json` — follower history from earlier records, loaded once per file (values flagged `h`)
+- `server/seed-accounts.json` — accounts added on first start (new usernames fill empty platforms once)
 - `public/` — the page (`index.html`, `app.js`, `app.css`, d3 v7.9.0 under its ISC licence)
 
 Run locally:
