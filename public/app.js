@@ -227,7 +227,7 @@
     // room at the bottom for names written at 45°
     const nameW = measure(items.map((d) => d.name), 'kt-tick kt-rank-text'), mb = Math.min(170, Math.ceil(nameW * Math.SQRT1_2) + 30) + 30;
     const y0 = d3.scaleLinear([lo, hi], [RH - mb, 0]).nice(5), ticks = y0.ticks(5);
-    const ml = Math.ceil(measure(ticks.map(o.axisFmt), 'kt-tick kt-rank-text')) + 38, mr = 12;
+    const ml = Math.ceil(measure(ticks.map(o.axisFmt), 'kt-tick kt-rank-text')) + 44, mr = 12;
     const x = d3.scaleBand(items.map((d) => d.name), [ml, W - mr]).paddingInner(0.3).paddingOuter(0.15);
     const bw = Math.min(56, x.bandwidth());
     // value labels: horizontal when they fit over the bar, otherwise upright
@@ -238,7 +238,7 @@
     const g = svg.append('g');
     g.selectAll('line').data(ticks).join('line').attr('class', 'kt-gridline').attr('x1', ml).attr('x2', W - mr).attr('y1', (d) => y(d)).attr('y2', (d) => y(d));
     g.selectAll('text').data(ticks).join('text').attr('class', 'kt-tick').attr('x', ml - 8).attr('y', (d) => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').text(o.axisFmt);
-    svg.append('text').attr('class', 'kt-axis-title').attr('transform', `translate(14,${(mt + RH - mb) / 2}) rotate(-90)`).attr('text-anchor', 'middle').text(o.yTitle);
+    svg.append('text').attr('class', 'kt-axis-title').attr('transform', `translate(18,${(mt + RH - mb) / 2}) rotate(-90)`).attr('text-anchor', 'middle').text(o.yTitle);
     svg.append('text').attr('class', 'kt-axis-title').attr('x', (ml + W - mr) / 2).attr('y', RH - 6).attr('text-anchor', 'middle').text(o.xTitle);
     svg.append('line').attr('class', 'kt-axis').attr('x1', ml).attr('x2', W - mr).attr('y1', y(0)).attr('y2', y(0));
     const cx = (d) => x(d.name) + x.bandwidth() / 2;
@@ -366,19 +366,21 @@
 
     const xTitle = (group === 'domestic' ? 'Domestic' : 'International') + ' Tourism Departments';
     rankChart($('#' + fid), {
-      items: withData.map((a) => ({ name: a.name, value: latest(a.id, plat).value, own: a.group === 'own' })),
+      items: withData.map((a) => ({ name: shortName(a.name), value: latest(a.id, plat).value, own: a.group === 'own' })),
       fmt: fmtN, axisFmt: fmtN, yTitle: 'Followers', xTitle, order: state.compOrder,
     });
     const gItems = [];
     for (const a of withData) {
       const g = growth(series(a.id, plat, per)), ks = [...g.keys()];
-      if (ks.length && g.get(ks[ks.length - 1]).pct != null) gItems.push({ name: a.name, value: Math.round(g.get(ks[ks.length - 1]).pct * 100) / 100, own: a.group === 'own' });
+      if (ks.length && g.get(ks[ks.length - 1]).pct != null) gItems.push({ name: shortName(a.name), value: Math.round(g.get(ks[ks.length - 1]).pct * 100) / 100, own: a.group === 'own' });
     }
     if (!gItems.length) emptyChart($('#' + gid), `Growth appears after the second ${per === 'daily' ? 'fetch' : per === 'monthly' ? 'month' : 'year'} of data.`);
     else rankChart($('#' + gid), { items: gItems, fmt: (v) => fmtP(v), axisFmt: (v) => d3.format('.1f')(v) + '%', yTitle: 'Growth %', xTitle, order: state.compOrder });
   }
 
   // ---------- tab: monthly data (one row per month, like the comparison sheet) ----------
+  // chart labels: the board's name without the word "Tourism" ("Kerala Tourism" -> "Kerala")
+  const shortName = (n) => n.replace(/\s*\bTourism\b\s*/gi, ' ').replace(/\s+/g, ' ').trim() || n;
   const monthName = (k) => d3.utcFormat('%b %Y')(toDate(k));
   function monthlyTable(acct) {
     const plats = platformsOf(acct);
