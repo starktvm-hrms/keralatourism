@@ -115,9 +115,9 @@
   }
 
   // ---------- charts ----------
-  function measure(strs) {
+  function measure(strs, cls = 'kt-tick') {
     const s = d3.select(document.body).append('svg').attr('class', 'kt-svg').style('position', 'absolute').style('visibility', 'hidden');
-    const t = s.append('text').attr('class', 'kt-tick');
+    const t = s.append('text').attr('class', cls);
     let w = 0; for (const str of strs) { t.text(str); w = Math.max(w, t.node().getComputedTextLength()); }
     s.remove(); return w;
   }
@@ -225,20 +225,20 @@
     const svg = d3.select(box).append('svg').attr('class', 'kt-svg kt-rank').attr('width', W > avail ? W : '100%').attr('viewBox', `0 0 ${W} ${RH}`);
     const lo = Math.min(0, d3.min(items, (d) => d.value)), hi = Math.max(0, d3.max(items, (d) => d.value)) || 1;
     // room at the bottom for names written at 45°
-    const nameW = measure(items.map((d) => d.name)), mb = Math.min(150, Math.ceil(nameW * Math.SQRT1_2) + 26) + 26;
+    const nameW = measure(items.map((d) => d.name), 'kt-tick kt-rank-text'), mb = Math.min(170, Math.ceil(nameW * Math.SQRT1_2) + 30) + 30;
     const y0 = d3.scaleLinear([lo, hi], [RH - mb, 0]).nice(5), ticks = y0.ticks(5);
-    const ml = Math.ceil(measure(ticks.map(o.axisFmt))) + 34, mr = 12;
+    const ml = Math.ceil(measure(ticks.map(o.axisFmt), 'kt-tick kt-rank-text')) + 38, mr = 12;
     const x = d3.scaleBand(items.map((d) => d.name), [ml, W - mr]).paddingInner(0.3).paddingOuter(0.15);
     const bw = Math.min(56, x.bandwidth());
     // value labels: horizontal when they fit over the bar, otherwise upright
-    const labW = measure(items.map((d) => o.fmt(d.value)));
+    const labW = measure(items.map((d) => o.fmt(d.value)), 'kt-bar-label kt-rank-text');
     const upright = labW + 6 > x.bandwidth() + x.step() * 0.3;
-    const mt = upright ? Math.ceil(labW) + 10 : 24;
+    const mt = upright ? Math.ceil(labW) + 12 : 28;
     const y = y0.copy().range([RH - mb, mt]);
     const g = svg.append('g');
     g.selectAll('line').data(ticks).join('line').attr('class', 'kt-gridline').attr('x1', ml).attr('x2', W - mr).attr('y1', (d) => y(d)).attr('y2', (d) => y(d));
     g.selectAll('text').data(ticks).join('text').attr('class', 'kt-tick').attr('x', ml - 8).attr('y', (d) => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end').text(o.axisFmt);
-    svg.append('text').attr('class', 'kt-axis-title').attr('transform', `translate(12,${(mt + RH - mb) / 2}) rotate(-90)`).attr('text-anchor', 'middle').text(o.yTitle);
+    svg.append('text').attr('class', 'kt-axis-title').attr('transform', `translate(14,${(mt + RH - mb) / 2}) rotate(-90)`).attr('text-anchor', 'middle').text(o.yTitle);
     svg.append('text').attr('class', 'kt-axis-title').attr('x', (ml + W - mr) / 2).attr('y', RH - 6).attr('text-anchor', 'middle').text(o.xTitle);
     svg.append('line').attr('class', 'kt-axis').attr('x1', ml).attr('x2', W - mr).attr('y1', y(0)).attr('y2', y(0));
     const cx = (d) => x(d.name) + x.bandwidth() / 2;
@@ -255,7 +255,7 @@
       })
       .text((d) => o.fmt(d.value));
     svg.append('g').selectAll('text').data(items).join('text').attr('class', 'kt-tick kt-rank-name')
-      .attr('text-anchor', 'end').attr('transform', (d) => `translate(${cx(d) + 4},${y.range()[0] + 14}) rotate(-45)`).text((d) => d.name);
+      .attr('text-anchor', 'end').attr('transform', (d) => `translate(${cx(d) + 5},${y.range()[0] + 16}) rotate(-45)`).text((d) => d.name);
   }
 
   const PERIOD_NOTE = {

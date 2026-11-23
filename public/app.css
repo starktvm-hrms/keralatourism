@@ -166,3 +166,5 @@ button.kt-tile { cursor: pointer; }
 .kt-monthly td:last-child, .kt-monthly th:last-child { padding-right: var(--cds-pad-lg); }
 .kt-monthly .kt-strong { font-weight: 600; }
 .kt-monthly tbody tr:hover td { background: color-mix(in srgb, var(--color-fg) 4%, var(--color-panel)); }
+/* ranked comparison charts: text 2pt larger than the dashboard's caption size */
+.kt-rank .kt-tick, .kt-rank .kt-axis-title, .kt-rank .kt-bar-label, .kt-rank-text { font-size: calc(var(--cds-font-size-caption) + 2pt); }
